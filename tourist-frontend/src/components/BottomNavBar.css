@@ -1,0 +1,84 @@
+.bottom-navbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 50;
+  background-color: var(--color-bg);
+  border-top: 1px solid var(--color-outline-variant);
+  box-shadow: 0px -4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.bottom-navbar-container {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 16px;
+  height: 72px;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  color: var(--color-text-muted);
+  border-radius: 16px;
+  transition: all var(--transition-fast);
+  width: 64px;
+  height: 56px;
+}
+
+.nav-item:hover, .nav-item:active {
+  background-color: var(--color-surface-dim);
+  color: var(--color-text);
+}
+
+.nav-item.active {
+  background-color: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  transform: scale(0.95);
+}
+
+.nav-label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+
+.nav-item .material-symbols-outlined {
+  font-size: 24px;
+}
+
+/* Alerts badge dot */
+.alerts-item {
+  position: relative;
+}
+
+.alerts-badge-dot {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-red);
+  border-radius: 50%;
+  border: 1.5px solid var(--color-bg);
+}
+
+.nav-item.active .alerts-badge-dot {
+  border-color: var(--color-primary-container);
+}
+
+/* Hide on desktop viewports */
+@media (min-width: 768px) {
+  .bottom-navbar {
+    display: none !important;
+  }
+}

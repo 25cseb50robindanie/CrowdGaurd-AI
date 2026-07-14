@@ -1,0 +1,28 @@
+.trending-section {
+  padding: 1.25rem;
+  width: 100%;
+}
+
+.trending-header {
+  margin-bottom: 1.15rem;
+}
+
+.trending-title {
+  font-size: 1.2rem;
+  color: var(--color-white);
+  text-transform: capitalize;
+  margin: 0;
+}
+
+.trending-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: block;
+  margin-top: 0.2rem;
+  font-weight: 300;
+}
+
+.trending-list {
+  display: flex;
+  flex-direction: column;
+}

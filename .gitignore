@@ -1,0 +1,9 @@
+# Ignore Python environment and YOLO run logs
+venv/
+runs/
+*.pt
+*.py
+__pycache__/
+
+# Ignore raw media assets in root
+CGAssests/

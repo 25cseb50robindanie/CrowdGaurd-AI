@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Shield outline and fill representing security & guard systems -->
+  <path d="M12 2L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 2Z" fill="#2563eb" stroke="#b4c5ff" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Target radar coordinates representing AI camera tracking -->
+  <circle cx="12" cy="12" r="5" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.8"/>
+  <circle cx="12" cy="12" r="2" fill="#ffffff"/>
+</svg>
