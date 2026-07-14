@@ -33,7 +33,7 @@ export default function App() {
 
   const fetchZones = async () => {
     try {
-      const response = await fetch('/api/zones');
+      const response = await fetch('http://localhost:8000/api/zones');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -44,7 +44,7 @@ export default function App() {
         setPollingError(false);
       }
     } catch (error) {
-      console.warn("Polling /api/zones failed. Falling back to simulated client-side state. Error:", error.message);
+      console.warn("Polling http://localhost:8000/api/zones failed. Falling back to simulated client-side state. Error:", error.message);
       setPollingError(true);
       
       // Fallback: update local state with minor random changes if API is down
