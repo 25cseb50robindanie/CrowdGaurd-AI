@@ -1,0 +1,16 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local virtual environment
+venv/
+ENV/
+
+# YOLO model weights (should be downloaded/placed locally)
+*.pt
+
+# Output data and snapshots (dynamic demo outputs)
+cv_output.json
+cv_output.json.tmp
+sample_frames/
