@@ -34,8 +34,8 @@ ZONE_CONFIGS = {
 }
 
 MAX_CAPACITIES = {
-    "gate4": 120,      # Max safe capacity for Platform 1 (high capacity sitting area)
-    "courtyard": 15,   # Max safe capacity for Platform 2 (walking corridor flow area)
+    "gate4": 15,       # Max safe capacity for Platform 1 (triggers alert on train crowd)
+    "courtyard": 120,  # Max safe capacity for Platform 2 (safe sitting area)
     "mainpath": 15
 }
 
