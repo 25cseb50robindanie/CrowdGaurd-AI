@@ -14,7 +14,7 @@ export const mockCameras = [
     id: "cam1", 
     name: "Camera 1", 
     label: "Platform 1", 
-    streamUrl: "/assets/cameras/4_processed.mp4", // Processed Video 4.mp4 (Safe sitting video)
+    streamUrl: "/assets/cameras/1_processed.mp4", // Processed Video 1.mp4 (Crowded train flow video)
     streamLabel: "CAM_01 // PLATFORM_1",
     boundingBoxes: []
   },
@@ -22,7 +22,7 @@ export const mockCameras = [
     id: "cam2", 
     name: "Camera 2", 
     label: "Platform 2", 
-    streamUrl: "/assets/cameras/1_processed.mp4", // Processed Video 1.mp4 (Crowded train flow video)
+    streamUrl: "/assets/cameras/4_processed.mp4", // Processed Video 4.mp4 (Safe sitting video)
     streamLabel: "CAM_02 // PLATFORM_2",
     boundingBoxes: []
   }
@@ -33,33 +33,11 @@ export const mockAlerts = [
     id: "alert1",
     zoneId: "gate4",
     zoneName: "Platform 1",
-    title: "Normal Platform Operations",
-    riskLevel: "green",
-    timestamp: "10m ago",
-    dateTime: "2026-07-12 13:19:15",
-    message: "Platform 1. Visual confirmation: commuters sitting/waiting. No physical crowd threats.",
-    streamUrl: "/assets/cameras/4_processed.mp4", // Safe processed video
-    boundingBoxes: [],
-    aiMetadata: {
-      congestion: "22.0%",
-      count: "33",
-      flowRate: "1.5 p/s",
-      streamId: "CG-V-00918",
-      integrity: {
-        engine: "LATENCY 125ms",
-        link: "NOMINAL"
-      }
-    }
-  },
-  {
-    id: "alert3",
-    zoneId: "courtyard",
-    zoneName: "Platform 2",
     title: "High Crowd Density Warning",
     riskLevel: "red",
     timestamp: "Just now",
     dateTime: "2026-07-12 14:02:11",
-    message: "Platform 2 - Sector B5. Rapid crowd accumulation detected from arriving train flow.",
+    message: "Platform 1 - Sector A7. Rapid crowd accumulation detected from arriving train flow.",
     streamUrl: "/assets/cameras/1_processed.mp4", // Live processed video
     boundingBoxes: [],
     aiMetadata: {
@@ -69,6 +47,28 @@ export const mockAlerts = [
       streamId: "CG-V-00912",
       integrity: {
         engine: "LATENCY 42ms",
+        link: "NOMINAL"
+      }
+    }
+  },
+  {
+    id: "alert3",
+    zoneId: "courtyard",
+    zoneName: "Platform 2",
+    title: "Normal Platform Operations",
+    riskLevel: "green",
+    timestamp: "10m ago",
+    dateTime: "2026-07-12 13:19:15",
+    message: "Platform 2. Visual confirmation: commuters sitting/waiting. No physical crowd threats.",
+    streamUrl: "/assets/cameras/4_processed.mp4", // Safe processed video
+    boundingBoxes: [],
+    aiMetadata: {
+      congestion: "22.0%",
+      count: "33",
+      flowRate: "1.5 p/s",
+      streamId: "CG-V-00918",
+      integrity: {
+        engine: "LATENCY 125ms",
         link: "NOMINAL"
       }
     }
