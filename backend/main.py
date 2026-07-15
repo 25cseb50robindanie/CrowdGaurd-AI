@@ -102,18 +102,43 @@ def get_live_zones_data() -> List[Zone]:
         Zone(zone_id="meadoweast", status="green", density=0.8, message="Safe")
     ]
     
-    # If the YOLO script hasn't generated the output file yet, serve baseline data
-    if not os.path.exists(CV_OUTPUT_PATH):
-        logger.warning(f"CV output file not found at {CV_OUTPUT_PATH}. Serving default mock zones.")
+    # Path to Vikas's YOLO CV output files (separate platforms)
+    gate4_path = os.path.abspath(os.path.join(BASE_DIR, "..", "cv-detection", "cv_output_gate4.json"))
+    courtyard_path = os.path.abspath(os.path.join(BASE_DIR, "..", "cv-detection", "cv_output_courtyard.json"))
+    
+    cv_zones = []
+    
+    # Try reading from Platform 1 (gate4) file
+    if os.path.exists(gate4_path):
+        try:
+            with open(gate4_path, 'r') as f:
+                data = json.load(f)
+                cv_zones.extend(data.get("zones", []))
+        except Exception as e:
+            logger.error(f"Error reading gate4 output: {e}")
+            
+    # Try reading from Platform 2 (courtyard) file
+    if os.path.exists(courtyard_path):
+        try:
+            with open(courtyard_path, 'r') as f:
+                data = json.load(f)
+                cv_zones.extend(data.get("zones", []))
+        except Exception as e:
+            logger.error(f"Error reading courtyard output: {e}")
+            
+    # Fallback to standard cv_output.json if separate files don't exist
+    if not cv_zones and os.path.exists(CV_OUTPUT_PATH):
+        try:
+            with open(CV_OUTPUT_PATH, 'r') as f:
+                data = json.load(f)
+                cv_zones.extend(data.get("zones", []))
+        except Exception as e:
+            logger.error(f"Error reading cv_output: {e}")
+
+    if not cv_zones:
         return fallback_zones
 
     try:
-        with open(CV_OUTPUT_PATH, 'r') as f:
-            cv_data = json.load(f)
-            
-        cv_zones = cv_data.get("zones", [])
-        if not cv_zones:
-            return fallback_zones
             
         # Attempt to fetch AI analysis from Person B's Agent server (port 8001)
         agent_url = "http://127.0.0.1:8001/analyze/zones"
