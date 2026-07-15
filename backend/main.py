@@ -101,19 +101,21 @@ def get_live_zones_data() -> List[Zone]:
         Zone(zone_id="fountaingrade", status="green", density=1.5, message="Safe"),
         Zone(zone_id="meadoweast", status="green", density=0.8, message="Safe")
     ]
-    
     # Path to Vikas's YOLO CV output files (separate platforms)
     gate4_path = os.path.abspath(os.path.join(BASE_DIR, "..", "cv-detection", "cv_output_gate4.json"))
     courtyard_path = os.path.abspath(os.path.join(BASE_DIR, "..", "cv-detection", "cv_output_courtyard.json"))
     
     cv_zones = []
-    
+
     # Try reading from Platform 1 (gate4) file
     if os.path.exists(gate4_path):
         try:
             with open(gate4_path, 'r') as f:
                 data = json.load(f)
-                cv_zones.extend(data.get("zones", []))
+                zones = data.get("zones", [])
+                gate4_zone = next((z for z in zones if z["zone_id"] == "gate4"), None)
+                if gate4_zone:
+                    cv_zones.append(gate4_zone)
         except Exception as e:
             logger.error(f"Error reading gate4 output: {e}")
             
@@ -122,7 +124,10 @@ def get_live_zones_data() -> List[Zone]:
         try:
             with open(courtyard_path, 'r') as f:
                 data = json.load(f)
-                cv_zones.extend(data.get("zones", []))
+                zones = data.get("zones", [])
+                courtyard_zone = next((z for z in zones if z["zone_id"] == "courtyard"), None)
+                if courtyard_zone:
+                    cv_zones.append(courtyard_zone)
         except Exception as e:
             logger.error(f"Error reading courtyard output: {e}")
             

@@ -9,3 +9,6 @@ __pycache__/
 
 # Ignore raw media assets in root
 CGAssests/
+
+# CV Processed Video Loops
+dashboard-frontend/public/assets/cameras/*_processed.mp4
