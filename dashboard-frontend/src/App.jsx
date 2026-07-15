@@ -30,11 +30,17 @@ export default function App() {
         })
         .then((data) => {
           if (data && data.zones) {
-            // Filter to only display the 3 active dashboard zones: gate4, courtyard, mainpath
+            // Filter to only display Platform 1 (gate4) and Platform 2 (courtyard)
             const dashboardZones = data.zones.filter(z => 
-              z.zone_id === 'gate4' || z.zone_id === 'courtyard' || z.zone_id === 'mainpath'
+              z.zone_id === 'gate4' || z.zone_id === 'courtyard'
             );
             setZones(dashboardZones);
+
+            // Automatically trigger the critical alert modal if Platform 1 (gate4) becomes red
+            const platform1Zone = data.zones.find(z => z.zone_id === 'gate4');
+            if (platform1Zone && platform1Zone.status === 'red') {
+              setShowCriticalAlert(true);
+            }
             
             // Map the new zone status and messages directly to update our active alerts stream
             setAlerts((prevAlerts) => {
