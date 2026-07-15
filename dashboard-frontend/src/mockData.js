@@ -4,9 +4,8 @@
 
 export const mockZonesData = {
   zones: [
-    { zone_id: "gate4", status: "red", density: 4.2, message: "Avoid — expected unsafe in 8 min" },
-    { zone_id: "courtyard", status: "green", density: 1.8, message: "Safe" },
-    { zone_id: "mainpath", status: "amber", density: 2.9, message: "Caution — increasing density" }
+    { zone_id: "gate4", status: "green", density: 1.0, message: "Safe" },
+    { zone_id: "courtyard", status: "green", density: 1.0, message: "Safe" }
   ]
 };
 
@@ -14,25 +13,17 @@ export const mockCameras = [
   { 
     id: "cam1", 
     name: "Camera 1", 
-    label: "Gate 4 Entrance", 
-    streamUrl: "/assets/cameras/4_processed.mp4", // Processed Video 4.mp4 mapped to Camera 1
-    streamLabel: "CAM_01 // GATE_4_NORTH",
+    label: "Platform 1", 
+    streamUrl: "/assets/cameras/1_processed.mp4", // Processed Video 1.mp4 mapped to Camera 1 (Platform 1)
+    streamLabel: "CAM_01 // PLATFORM_1",
     boundingBoxes: []
   },
   { 
     id: "cam2", 
     name: "Camera 2", 
-    label: "Courtyard East", 
-    streamUrl: "/assets/cameras/1_processed.mp4", // Processed video 1.mp4 mapped to Camera 2
-    streamLabel: "CAM_02 // COURTYARD_EAST",
-    boundingBoxes: []
-  },
-  { 
-    id: "cam3", 
-    name: "Camera 3", 
-    label: "Main Shrine Path", 
-    streamUrl: "/assets/cameras/5_processed.mp4", // Processed Video 5.mp4 mapped to Camera 3
-    streamLabel: "CAM_03 // SHRINE_PATH",
+    label: "Platform 2", 
+    streamUrl: "/assets/cameras/5_processed.mp4", // Processed Video 5.mp4 mapped to Camera 2 (Platform 2)
+    streamLabel: "CAM_02 // PLATFORM_2",
     boundingBoxes: []
   }
 ];
@@ -41,27 +32,14 @@ export const mockAlerts = [
   {
     id: "alert1",
     zoneId: "gate4",
-    zoneName: "Gate 4 Entrance",
-    title: "Aggressive Movement Detected",
+    zoneName: "Platform 1",
+    title: "High Crowd Density Warning",
     riskLevel: "red",
-    timestamp: "2m ago",
+    timestamp: "Just now",
     dateTime: "2026-07-12 14:02:11",
-    message: "Gate 4 Entrance - Sector A7. Multiple subjects showing high-velocity directional changes. Possible bottleneck forming.",
-    streamUrl: "/assets/cameras/4.mp4", // Camera 1 stream
-    boundingBoxes: [
-      { 
-        id: "ab1-box1", 
-        label: "CONGESTION AREA A7: RED RISK", 
-        style: { border: "2px solid #ffb4ab", top: "33%", left: "25%", width: "10rem", height: "14rem" }, 
-        badgeStyle: "bg-error text-on-error" 
-      },
-      { 
-        id: "ab1-box2", 
-        label: "FLOW SECTOR B2: GREEN", 
-        style: { border: "2px solid #b4c5ff", top: "25%", right: "33%", width: "7rem", height: "10rem", opacity: 0.5 }, 
-        badgeStyle: "bg-primary text-on-primary" 
-      }
-    ],
+    message: "Platform 1 - Sector A7. Rapid crowd accumulation detected from arriving train flow.",
+    streamUrl: "/assets/cameras/1_processed.mp4", // Live Processed video
+    boundingBoxes: [],
     aiMetadata: {
       congestion: "92.4%",
       count: "1,248",
@@ -74,44 +52,15 @@ export const mockAlerts = [
     }
   },
   {
-    id: "alert2",
-    zoneId: "mainpath",
-    zoneName: "Main Shrine Path",
-    title: "Path Obstruction Reported",
-    riskLevel: "amber",
-    timestamp: "12m ago",
-    dateTime: "2026-07-12 13:52:10",
-    message: "Debris or slowdown detected on Main Shrine Path. bottlenecks forming near the steps.",
-    streamUrl: "/assets/cameras/5.mp4", // Camera 3 stream
-    boundingBoxes: [
-      { 
-        id: "ab2-box1", 
-        label: "OBSTRUCTION L4: AMBER", 
-        style: { border: "2px solid #f59e0b", top: "40%", left: "45%", width: "9rem", height: "11rem" }, 
-        badgeStyle: "bg-amber-500 text-black" 
-      }
-    ],
-    aiMetadata: {
-      congestion: "65.1%",
-      count: "782",
-      flowRate: "4.1 p/s",
-      streamId: "CG-V-00914",
-      integrity: {
-        engine: "LATENCY 48ms",
-        link: "NOMINAL"
-      }
-    }
-  },
-  {
     id: "alert3",
     zoneId: "courtyard",
-    zoneName: "Courtyard East",
-    title: "Sensor Sync Lag - Node 04",
+    zoneName: "Platform 2",
+    title: "Normal Platform Operations",
     riskLevel: "green",
-    timestamp: "45m ago",
+    timestamp: "10m ago",
     dateTime: "2026-07-12 13:19:15",
-    message: "High latency on sensor node 04. Data syncing with delay. No physical crowd threat active.",
-    streamUrl: "/assets/cameras/1.mp4", // Camera 2 stream
+    message: "Platform 2. Visual confirmation: commuters sitting/waiting. No physical crowd threats.",
+    streamUrl: "/assets/cameras/5_processed.mp4", // Safe Processed video
     boundingBoxes: [],
     aiMetadata: {
       congestion: "22.0%",
@@ -127,10 +76,7 @@ export const mockAlerts = [
 ];
 
 export const mockHistoricalAlerts = [
-  { id: "#CRD-9402", zoneName: "Main Gate East", timestamp: "2026-07-12 12:22:10", riskLevel: "red", status: "Dispatched" },
-  { id: "#CRD-9398", zoneName: "Sacred Sanctum", timestamp: "2026-07-12 11:50:45", riskLevel: "amber", status: "Resolved" },
-  { id: "#CRD-9385", zoneName: "North Exit Gate", timestamp: "2026-07-12 10:15:33", riskLevel: "green", status: "Resolved" },
-  { id: "#CRD-9382", zoneName: "Courtyard Perimeter", timestamp: "2026-07-12 09:42:01", riskLevel: "red", status: "Resolved" },
-  { id: "#CRD-9361", zoneName: "East Tunnel Approach", timestamp: "2026-07-12 08:11:43", riskLevel: "amber", status: "Resolved" },
-  { id: "#CRD-9355", zoneName: "West Plaza", timestamp: "2026-07-12 07:33:12", riskLevel: "green", status: "Resolved" }
+  { id: "#CRD-9402", zoneName: "Platform 1 East", timestamp: "2026-07-12 12:22:10", riskLevel: "red", status: "Dispatched" },
+  { id: "#CRD-9398", zoneName: "Platform 2 North", timestamp: "2026-07-12 11:50:45", riskLevel: "amber", status: "Resolved" },
+  { id: "#CRD-9385", zoneName: "Platform 2 Corridor", timestamp: "2026-07-12 10:15:33", riskLevel: "green", status: "Resolved" }
 ];
