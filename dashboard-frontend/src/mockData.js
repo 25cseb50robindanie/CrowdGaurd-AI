@@ -15,7 +15,7 @@ export const mockCameras = [
     id: "cam1", 
     name: "Camera 1", 
     label: "Gate 4 Entrance", 
-    streamUrl: "/assets/cameras/4.mp4", // Video 4.mp4 mapped to Camera 1
+    streamUrl: "/assets/cameras/4_processed.mp4", // Processed Video 4.mp4 mapped to Camera 1
     streamLabel: "CAM_01 // GATE_4_NORTH",
     boundingBoxes: [
       { 
@@ -36,7 +36,7 @@ export const mockCameras = [
     id: "cam2", 
     name: "Camera 2", 
     label: "Courtyard East", 
-    streamUrl: "/assets/cameras/1.mp4", // Updated video 1.mp4 mapped to Camera 2
+    streamUrl: "/assets/cameras/1_processed.mp4", // Processed video 1.mp4 mapped to Camera 2
     streamLabel: "CAM_02 // COURTYARD_EAST",
     boundingBoxes: [
       { 
@@ -51,7 +51,7 @@ export const mockCameras = [
     id: "cam3", 
     name: "Camera 3", 
     label: "Main Shrine Path", 
-    streamUrl: "/assets/cameras/5.mp4", // Video 5.mp4 mapped to Camera 3
+    streamUrl: "/assets/cameras/5_processed.mp4", // Processed Video 5.mp4 mapped to Camera 3
     streamLabel: "CAM_03 // SHRINE_PATH",
     boundingBoxes: [
       { 
