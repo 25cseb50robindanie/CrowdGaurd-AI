@@ -45,7 +45,7 @@ export default function CriticalAlertModal({ isOpen, onClose, onDispatch, onView
           </div>
           
           <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 leading-relaxed max-w-sm">
-            <span className="text-on-surface font-bold">Gate 4 - Critical Density:</span> Density rising rapidly near boarding point due to converging crowd inflow. Risk level RED.
+            <span className="text-on-surface font-bold">Platform 1 - Critical Density:</span> Density rising rapidly near boarding point due to converging crowd inflow. Risk level RED.
           </p>
           
           {/* Actions */}

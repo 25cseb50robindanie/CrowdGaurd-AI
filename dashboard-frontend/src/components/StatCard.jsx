@@ -35,7 +35,7 @@ export default function StatCard({ zones, alerts, camerasCount }) {
         <p className="font-label-caps text-label-caps text-error mb-2">Current Highest Risk Zone</p>
         <div className="flex items-baseline space-x-2">
           <span className="font-headline-lg text-headline-lg font-data-display text-error">
-            {highestRiskZoneName === 'GATE4' ? 'Gate 4' : highestRiskZoneName}
+            {highestRiskZoneName === 'GATE4' ? 'Platform 1' : (highestRiskZoneName === 'COURTYARD' ? 'Platform 2' : highestRiskZoneName)}
           </span>
         </div>
       </div>

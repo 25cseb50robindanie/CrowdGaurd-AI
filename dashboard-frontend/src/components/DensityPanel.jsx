@@ -35,11 +35,11 @@ export default function DensityPanel({ zones }) {
   const formatZoneName = (id) => {
     switch (id) {
       case 'gate4':
-        return 'Gate 4 Entrance (Active)';
+        return 'Platform 1';
       case 'courtyard':
-        return 'Main Courtyard';
+        return 'Platform 2';
       case 'mainpath':
-        return 'Main Shrine Path';
+        return 'Main Path';
       default:
         return id.charAt(0).toUpperCase() + id.slice(1);
     }
