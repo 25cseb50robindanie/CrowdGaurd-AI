@@ -33,11 +33,10 @@ ZONE_CONFIGS = {
     }
 }
 
-# Define maximum safe capacities for the active zones to scale risk levels correctly
 MAX_CAPACITIES = {
-    "gate4": 12,       # Max safe people in Gate 4 area
-    "courtyard": 15,   # Max safe people in Courtyard
-    "mainpath": 15     # Max safe people on Main Path
+    "gate4": 120,      # Max safe capacity for Platform 1 (high capacity sitting area)
+    "courtyard": 15,   # Max safe capacity for Platform 2 (walking corridor flow area)
+    "mainpath": 15
 }
 
 # General configuration constants
@@ -131,7 +130,7 @@ def write_json_atomic(data, target_path):
 # ==============================================================================
 def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_interval, 
                  write_interval, density_multiplier, output_mode, host, port, test_mode,
-                 output_video_path=None, max_frames=None):
+                 output_video_path=None, max_frames=None, target_zone_id=None):
     global latest_payload
     
     # 1. Device check
@@ -297,11 +296,16 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 
                 # Check which zone it falls in
                 assigned_zone = None
-                for zone_id, zconfig in ZONE_CONFIGS.items():
-                    if is_inside_rect((cx, cy), zconfig["rect"]):
-                        current_counts[zone_id] += 1
-                        assigned_zone = zone_id
-                        break
+                if target_zone_id:
+                    # If target_zone_id is specified, count everyone in the frame for this zone!
+                    current_counts[target_zone_id] += 1
+                    assigned_zone = target_zone_id
+                else:
+                    for zone_id, zconfig in ZONE_CONFIGS.items():
+                        if is_inside_rect((cx, cy), zconfig["rect"]):
+                            current_counts[zone_id] += 1
+                            assigned_zone = zone_id
+                            break
                 
                 # Draw bounding box on frame
                 box_color = ZONE_CONFIGS[assigned_zone]["color"] if assigned_zone else (128, 128, 128)
@@ -311,6 +315,8 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
 
             # Draw zone boundaries & statistics overlay on the frame
             for zone_id, zconfig in ZONE_CONFIGS.items():
+                if target_zone_id and zone_id != target_zone_id:
+                    continue
                 rx1, ry1, rx2, ry2 = zconfig["rect"]
                 color = zconfig["color"]
                 count = current_counts[zone_id]
@@ -404,6 +410,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-json", type=str, default="", help="Path to write JSON output")
     parser.add_argument("--output-video", type=str, default="", help="Path to save processed output video")
     parser.add_argument("--max-frames", type=int, default=None, help="Stop processing after this many frames")
+    parser.add_argument("--zone-id", type=str, default=None, help="If specified, count all people in frame for this zone")
     parser.add_argument("--camera-id", type=str, default=DEFAULT_CAMERA_ID, help="Camera ID to report")
     parser.add_argument("--loop", action="store_true", default=True, help="Loop video back to start when finished")
     parser.add_argument("--no-loop", action="store_false", dest="loop", help="Do not loop video")
@@ -462,5 +469,6 @@ if __name__ == "__main__":
         port=args.port,
         test_mode=args.test_mode,
         output_video_path=args.output_video,
-        max_frames=args.max_frames
+        max_frames=args.max_frames,
+        target_zone_id=args.zone_id
     )
