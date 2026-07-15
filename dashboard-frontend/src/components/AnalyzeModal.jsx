@@ -1,9 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function AnalyzeModal({ alert, onClose, onDispatch }) {
   const [officerNotes, setOfficerNotes] = useState('');
   const [notesFocused, setNotesFocused] = useState(false);
   const [aiLayersActive, setAiLayersActive] = useState(true);
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    // Sync playback time from the dashboard's main video player to keep it looking like a continuous live stream
+    const mainVideo = document.querySelector('main video');
+    if (mainVideo && videoRef.current) {
+      const syncTime = () => {
+        if (videoRef.current && mainVideo) {
+          videoRef.current.currentTime = mainVideo.currentTime;
+        }
+      };
+
+      if (videoRef.current.readyState >= 1) {
+        syncTime();
+      } else {
+        videoRef.current.addEventListener('loadedmetadata', syncTime);
+        return () => {
+          if (videoRef.current) {
+            videoRef.current.removeEventListener('loadedmetadata', syncTime);
+          }
+        };
+      }
+    }
+  }, [alert]);
 
   if (!alert) return null;
 
@@ -77,6 +101,7 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
             <div className="relative flex-1 bg-black group overflow-hidden">
               {/* Expanded Surveillance Video Player - Loaded dynamically from centralized config */}
               <video
+                ref={videoRef}
                 key={alert.id}
                 src={alert.streamUrl || "/assets/cameras/1.mp4"}
                 autoPlay
