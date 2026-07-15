@@ -123,7 +123,8 @@ def write_json_atomic(data, target_path):
 # CORE PIPELINE RUNNER
 # ==============================================================================
 def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_interval, 
-                 write_interval, density_multiplier, output_mode, host, port, test_mode):
+                 write_interval, density_multiplier, output_mode, host, port, test_mode,
+                 output_video_path=None, max_frames=None):
     global latest_payload
     
     # 1. Device check
@@ -187,6 +188,34 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     print(f"[CV-Detection] Video details: {width}x{height} @ {fps:.1f} FPS")
 
+    # Initialize VideoWriter if output_video_path is provided
+    writer = None
+    if output_video_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_video_path)), exist_ok=True)
+        if os.path.exists(output_video_path):
+            try:
+                os.remove(output_video_path)
+            except:
+                pass
+        # Try avc1 first, fallback to mp4v
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+        if not writer.isOpened():
+            print("[CV-Detection] WARNING: avc1 codec not supported. Cleaning up and falling back to mp4v...")
+            writer.release()
+            if os.path.exists(output_video_path):
+                try:
+                    os.remove(output_video_path)
+                except:
+                    pass
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+        if writer.isOpened():
+            print(f"[CV-Detection] Processed video writer opened. Saving to: {output_video_path}")
+        else:
+            print(f"[CV-Detection] ERROR: Could not open VideoWriter for: {output_video_path}")
+            writer = None
+
     # Ensure sample frames folder exists
     sample_frames_dir = os.path.join(script_dir, "sample_frames")
     os.makedirs(sample_frames_dir, exist_ok=True)
@@ -217,15 +246,18 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
             
             # Handle video end/loops
             if not ret:
-                if loop_video:
+                if loop_video and (max_frames is None or frame_count < max_frames):
                     print("[CV-Detection] Video reached end. Looping back to frame 0...")
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
                 else:
-                    print("[CV-Detection] Video completed. Exiting processing loop...")
+                    print("[CV-Detection] Video completed or limit reached. Exiting processing loop...")
                     break
 
             frame_count += 1
+            if max_frames is not None and frame_count > max_frames:
+                print(f"[CV-Detection] Reached max frames limit ({max_frames}). Exiting loop...")
+                break
             
             # Run YOLOv8 on frame, class 0 (person)
             results = model.predict(frame, device=device, classes=[0], verbose=False)
@@ -275,6 +307,10 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 # Label current count
                 cv2.putText(frame, f"Count: {count}", (rx1 + 5, ry1 + 45),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+            # Write frame to output video if writer is active
+            if writer is not None:
+                writer.write(frame)
 
             # 5. Save histories & compute trends
             for zone_id, count in current_counts.items():
@@ -335,6 +371,9 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
         print(f"\n[CV-Detection] CRITICAL Error in processing loop: {e}")
     finally:
         cap.release()
+        if writer is not None:
+            writer.release()
+            print("[CV-Detection] Processed video writer released successfully.")
         cv2.destroyAllWindows()
         print("[CV-Detection] Resources released. Shutdown complete.")
 
@@ -345,6 +384,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CrowdGuardAI - CV Detection pipeline")
     parser.add_argument("--video", type=str, default="", help="Path to input video file")
     parser.add_argument("--output-json", type=str, default="", help="Path to write JSON output")
+    parser.add_argument("--output-video", type=str, default="", help="Path to save processed output video")
+    parser.add_argument("--max-frames", type=int, default=None, help="Stop processing after this many frames")
     parser.add_argument("--camera-id", type=str, default=DEFAULT_CAMERA_ID, help="Camera ID to report")
     parser.add_argument("--loop", action="store_true", default=True, help="Loop video back to start when finished")
     parser.add_argument("--no-loop", action="store_false", dest="loop", help="Do not loop video")
@@ -381,6 +422,10 @@ if __name__ == "__main__":
     print(f"Output Mode        : {args.mode}")
     if args.mode in ["file", "both"]:
         print(f"Output JSON Path   : {output_json}")
+    if args.output_video:
+        print(f"Output Video Path  : {args.output_video}")
+    if args.max_frames:
+        print(f"Max Frames Limit   : {args.max_frames}")
     if args.mode in ["api", "both"]:
         print(f"API Endpoint       : http://{args.host}:{args.port}/status")
     print(f"Video Looping      : {args.loop}")
@@ -397,5 +442,7 @@ if __name__ == "__main__":
         output_mode=args.mode,
         host=args.host,
         port=args.port,
-        test_mode=args.test_mode
+        test_mode=args.test_mode,
+        output_video_path=args.output_video,
+        max_frames=args.max_frames
     )
