@@ -152,6 +152,19 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
             print("[CV-Detection] Local yolov8n.pt not found. Will download automatically.")
             model_path = "yolov8n.pt"
 
+    # Workaround: PyTorch fails to load paths containing single quotes on Windows
+    if "'" in model_path or '"' in model_path:
+        import shutil
+        user_home = os.path.expanduser("~")
+        safe_model_path = os.path.join(user_home, "yolov8n.pt")
+        print(f"[CV-Detection] Path contains quotes. Copying model to safe path: {safe_model_path}")
+        try:
+            if not os.path.exists(safe_model_path) or os.path.getsize(safe_model_path) != os.path.getsize(model_path):
+                shutil.copy(model_path, safe_model_path)
+            model_path = safe_model_path
+        except Exception as copy_err:
+            print(f"[CV-Detection] WARNING: Could not copy model to safe path: {copy_err}")
+
     try:
         model = YOLO(model_path)
     except Exception as e:
