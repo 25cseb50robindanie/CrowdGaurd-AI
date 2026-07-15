@@ -18,6 +18,7 @@ export default function App() {
   const [showCriticalAlert, setShowCriticalAlert] = useState(false); // Controls CriticalAlertModal
   const [dispatchLogs, setDispatchLogs] = useState([]); // List of dispatched events
   const [toasts, setToasts] = useState([]); // List of active toasts
+  const dispatchedZonesRef = React.useRef([]); // Keeps track of dispatched zones to prevent duplicate popups
 
   // Resilient Polling: Queries the FastAPI backend every 2 seconds
   // Falls back to static mock data if the API server is not running
@@ -36,9 +37,10 @@ export default function App() {
             );
             setZones(dashboardZones);
 
-            // Automatically trigger the critical alert modal if Platform 2 (courtyard) becomes red
-            const platform2Zone = data.zones.find(z => z.zone_id === 'courtyard');
-            if (platform2Zone && platform2Zone.status === 'red') {
+            // Automatically trigger the critical alert modal if Platform 1 (gate4) becomes red
+            // and has not been dispatched yet!
+            const platform1Zone = data.zones.find(z => z.zone_id === 'gate4');
+            if (platform1Zone && platform1Zone.status === 'red' && !dispatchedZonesRef.current.includes('gate4')) {
               setShowCriticalAlert(true);
             }
             
@@ -86,6 +88,10 @@ export default function App() {
 
   // Dispatch Force action handler
   const handleDispatch = (alert) => {
+    const zoneId = alert.zoneId || alert.zone_id || "gate4";
+    if (!dispatchedZonesRef.current.includes(zoneId)) {
+      dispatchedZonesRef.current.push(zoneId);
+    }
     // 1. Trigger toast
     handleAddToast("Alert sent to Station Control Room");
 
@@ -118,10 +124,10 @@ export default function App() {
 
   // Triggered when clicking Analyze inside Critical Alert Modal
   const handleViewCriticalDetails = () => {
-    // Find the Courtyard red alert from alerts array
-    const courtyardAlert = alerts.find((a) => a.zoneId === 'courtyard') || alerts[0];
+    // Find the Platform 1 (gate4) red alert from alerts array
+    const gate4Alert = alerts.find((a) => a.zoneId === 'gate4') || alerts[0];
     setShowCriticalAlert(false);
-    setAnalyzeAlert(courtyardAlert);
+    setAnalyzeAlert(gate4Alert);
   };
 
   return (
@@ -175,8 +181,8 @@ export default function App() {
           isOpen={showCriticalAlert}
           onClose={() => setShowCriticalAlert(false)}
           onDispatch={() => {
-            const courtyardAlert = alerts.find((a) => a.zoneId === 'courtyard') || alerts[0];
-            handleDispatch(courtyardAlert);
+            const gate4Alert = alerts.find((a) => a.zoneId === 'gate4') || alerts[0];
+            handleDispatch(gate4Alert);
             setShowCriticalAlert(false);
           }}
           onViewDetails={handleViewCriticalDetails}
