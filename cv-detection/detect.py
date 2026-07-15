@@ -259,8 +259,10 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 print(f"[CV-Detection] Reached max frames limit ({max_frames}). Exiting loop...")
                 break
             
-            # Run YOLOv8 on frame, class 0 (person)
-            results = model.predict(frame, device=device, classes=[0], verbose=False)
+            # Resize frame for fast YOLOv8 inference (reduces data load by 16x)
+            inference_w, inference_h = 960, 540
+            small_frame = cv2.resize(frame, (inference_w, inference_h))
+            results = model.predict(small_frame, device=device, classes=[0], verbose=False)
             boxes = results[0].boxes if results and len(results) > 0 else []
 
             # Reset counts for this frame
@@ -270,7 +272,15 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
             # 4. Check detections & center points
             for box in boxes:
                 xyxy = box.xyxy[0].cpu().numpy()
-                x1, y1, x2, y2 = map(int, xyxy)
+                x1_small, y1_small, x2_small, y2_small = map(int, xyxy)
+                
+                # Scale coordinates back to original frame size
+                scale_x = width / inference_w
+                scale_y = height / inference_h
+                x1 = int(x1_small * scale_x)
+                y1 = int(y1_small * scale_y)
+                x2 = int(x2_small * scale_x)
+                y2 = int(y2_small * scale_y)
                 
                 # Person center point
                 cx = (x1 + x2) // 2
