@@ -33,6 +33,13 @@ ZONE_CONFIGS = {
     }
 }
 
+# Define maximum safe capacities for the active zones to scale risk levels correctly
+MAX_CAPACITIES = {
+    "gate4": 12,       # Max safe people in Gate 4 area
+    "courtyard": 15,   # Max safe people in Courtyard
+    "mainpath": 15     # Max safe people on Main Path
+}
+
 # General configuration constants
 DEFAULT_CAMERA_ID = "cam1"
 DEFAULT_WRITE_INTERVAL_SEC = 1.0     # Write output JSON every 1 second
@@ -259,10 +266,11 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 print(f"[CV-Detection] Reached max frames limit ({max_frames}). Exiting loop...")
                 break
             
-            # Resize frame for fast YOLOv8 inference (reduces data load by 16x)
-            inference_w, inference_h = 960, 540
+            # Resize frame for fast YOLOv8 inference (balanced for HD detail and CPU speed)
+            inference_w, inference_h = 1280, 720
             small_frame = cv2.resize(frame, (inference_w, inference_h))
-            results = model.predict(small_frame, device=device, classes=[0], verbose=False)
+            # Lowered confidence threshold (conf=0.12) to detect partially occluded/distant crowds
+            results = model.predict(small_frame, device=device, classes=[0], conf=0.12, verbose=False)
             boxes = results[0].boxes if results and len(results) > 0 else []
 
             # Reset counts for this frame
@@ -332,9 +340,9 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 zones_payload = []
                 for zone_id, zconfig in ZONE_CONFIGS.items():
                     count = current_counts[zone_id]
-                    area = zone_areas[zone_id]
-                    # Calculate density per pixel area, scaled up
-                    density = round((count / area) * density_multiplier, 2)
+                    # Calculate capacity-based density scaled to 0.0 - 5.0 range expected by AI & frontends
+                    max_cap = MAX_CAPACITIES.get(zone_id, 10.0)
+                    density = round((count / max_cap) * 5.0, 2)
                     trend = calculate_trend(zone_histories[zone_id])
                     
                     zones_payload.append({
