@@ -17,20 +17,7 @@ export const mockCameras = [
     label: "Gate 4 Entrance", 
     streamUrl: "/assets/cameras/4_processed.mp4", // Processed Video 4.mp4 mapped to Camera 1
     streamLabel: "CAM_01 // GATE_4_NORTH",
-    boundingBoxes: [
-      { 
-        id: "c1-box1", 
-        label: "PERSON_082 RISK: RED", 
-        style: { border: "2px solid #ffb4ab", top: "25%", left: "33%", width: "8rem", height: "12rem" }, 
-        badgeStyle: "bg-error text-on-error" 
-      },
-      { 
-        id: "c1-box2", 
-        label: "PERSON_104 RISK: GREEN", 
-        style: { border: "2px solid #b4c5ff", top: "33%", right: "25%", width: "6rem", height: "10rem", opacity: 0.5 }, 
-        badgeStyle: "bg-primary text-on-primary" 
-      }
-    ]
+    boundingBoxes: []
   },
   { 
     id: "cam2", 
@@ -38,14 +25,7 @@ export const mockCameras = [
     label: "Courtyard East", 
     streamUrl: "/assets/cameras/1_processed.mp4", // Processed video 1.mp4 mapped to Camera 2
     streamLabel: "CAM_02 // COURTYARD_EAST",
-    boundingBoxes: [
-      { 
-        id: "c2-box1", 
-        label: "PERSON_221 RISK: GREEN", 
-        style: { border: "2px solid #b4c5ff", top: "20%", left: "40%", width: "5rem", height: "9rem", opacity: 0.5 }, 
-        badgeStyle: "bg-primary text-on-primary" 
-      }
-    ]
+    boundingBoxes: []
   },
   { 
     id: "cam3", 
@@ -53,14 +33,7 @@ export const mockCameras = [
     label: "Main Shrine Path", 
     streamUrl: "/assets/cameras/5_processed.mp4", // Processed Video 5.mp4 mapped to Camera 3
     streamLabel: "CAM_03 // SHRINE_PATH",
-    boundingBoxes: [
-      { 
-        id: "c3-box1", 
-        label: "PERSON_412 RISK: AMBER", 
-        style: { border: "2px solid #f59e0b", top: "45%", left: "50%", width: "7rem", height: "11rem" }, 
-        badgeStyle: "bg-amber-500 text-black" 
-      }
-    ]
+    boundingBoxes: []
   }
 ];
 
