@@ -69,6 +69,77 @@ def get_status():
     with payload_lock:
         return latest_payload
 
+def fetch_agent_analysis(zones_payload):
+    """
+    Sends the raw count and density payload to the local Agent service (port 8001).
+    Translates risk levels, predictions, and recommendations to the dashboard format.
+    Falls back to a rule-based mapping if the Agent service is offline.
+    """
+    import urllib.request
+    import json
+    
+    agent_url = "http://127.0.0.1:8001/analyze/zones"
+    
+    try:
+        # Prepare request payload for Person B's endpoint
+        req_data = []
+        for z in zones_payload:
+            req_data.append({
+                "zone_id": z["zone_id"],
+                "person_count": z["person_count"],
+                "density": z["density"],
+                "trend": z["trend"]
+            })
+            
+        req = urllib.request.Request(
+            agent_url,
+            data=json.dumps(req_data).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        
+        # 1.5 seconds timeout to keep the pipeline extremely fast and responsive
+        with urllib.request.urlopen(req, timeout=1.5) as response:
+            analysis_results = json.loads(response.read().decode("utf-8"))
+            
+            dashboard_zones = []
+            for analysis in analysis_results:
+                zone_id = analysis["zone_id"]
+                risk_level = analysis["risk_level"]
+                prediction = analysis["prediction"]
+                recommendation = analysis["recommendation"]
+                explanation = analysis["explanation"]
+                
+                # Map risk level to frontend status (red/amber/green)
+                status = "green"
+                if risk_level == "high":
+                    status = "red"
+                elif risk_level == "medium":
+                    status = "amber"
+                
+                # Find matching original density
+                density = next((z["density"] for z in zones_payload if z["zone_id"] == zone_id), 0.0)
+                
+                # Combine explanation & recommendation into the message shown on dashboard and tourist maps
+                message = f"{explanation} Recommendation: {recommendation}"
+                
+                dashboard_zones.append({
+                    "zone_id": zone_id,
+                    "status": status,
+                    "density": density,
+                    "message": message,
+                    # Extra fields for possible future frontend extension
+                    "prediction": prediction,
+                    "recommendation": recommendation,
+                    "explanation": explanation
+                })
+            return dashboard_zones
+            
+    except Exception as e:
+        # Print warning but fail silently so the website keeps working with rule-based fallback
+        print(f"[CV-Detection-API] Agent analysis failed, using rule-based fallback: {e}")
+        return None
+
 @app.get("/api/zones")
 def get_api_zones():
     """Translates the raw YOLO detector coordinates into crowd safety statuses (red/amber/green)."""
@@ -87,38 +158,41 @@ def get_api_zones():
                 ]
             }
         
-        # Translate the live YOLO output payload
-        dashboard_zones = []
-        for z in latest_payload["zones"]:
-            status = "green"
-            message = "Safe"
-            
-            # Map raw pixel densities to safety categories
-            if z["density"] >= 3.5:
-                status = "red"
-                message = "Avoid — density threshold exceeded"
-            elif z["density"] >= 2.2:
-                status = "amber"
-                message = "Caution — increasing density"
-            else:
+        # Try to call the Agent service (port 8001) first
+        dashboard_zones = fetch_agent_analysis(latest_payload["zones"])
+        
+        # Fallback to rule-based mapping if agent service is offline
+        if dashboard_zones is None:
+            dashboard_zones = []
+            for z in latest_payload["zones"]:
                 status = "green"
                 message = "Safe"
                 
-            # Specific warnings overrides from design guidelines
-            if z["zone_id"] == "gate4" and status == "red":
-                message = "Avoid — expected unsafe in 8 min"
-            elif z["zone_id"] == "seafoodmarket" and status == "amber":
-                message = "Caution — busy vendor area"
-                
-            dashboard_zones.append({
-                "zone_id": z["zone_id"],
-                "status": status,
-                "density": z["density"],
-                "message": message
-            })
+                # Map raw pixel densities to safety categories
+                if z["density"] >= 3.5:
+                    status = "red"
+                    message = "Avoid — density threshold exceeded"
+                elif z["density"] >= 2.2:
+                    status = "amber"
+                    message = "Caution — increasing density"
+                else:
+                    status = "green"
+                    message = "Safe"
+                    
+                # Specific warnings overrides from design guidelines
+                if z["zone_id"] == "gate4" and status == "red":
+                    message = "Avoid — expected unsafe in 8 min"
+                elif z["zone_id"] == "seafoodmarket" and status == "amber":
+                    message = "Caution — busy vendor area"
+                    
+                dashboard_zones.append({
+                    "zone_id": z["zone_id"],
+                    "status": status,
+                    "density": z["density"],
+                    "message": message
+                })
             
         # Ensure all baseline zones are returned (even if not active in current camera frame)
-        # This keeps the layout structured for all locations in the tourist app
         active_ids = [dz["zone_id"] for dz in dashboard_zones]
         fallback_zones = [
             { "zone_id": "gate4", "status": "red", "density": 4.2, "message": "Avoid — expected unsafe in 8 min" },
