@@ -62,7 +62,7 @@ export default function App() {
         .catch((err) => {
           // Dev server is offline; fallback silently to the local mock data
         });
-    }, 2000);
+    }, 5000);
 
     return () => clearInterval(pollBackend);
   }, [alerts]);

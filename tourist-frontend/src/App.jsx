@@ -24,8 +24,8 @@ export default function App() {
     // Immediate initial fetch
     fetchZones();
 
-    // Set up polling interval every 1.5 seconds (1500 ms)
-    const intervalId = setInterval(fetchZones, 1500);
+    // Set up polling interval every 5 seconds (optimized for Gemini API rate limits)
+    const intervalId = setInterval(fetchZones, 5000);
 
     // Cleanup interval on unmount
     return () => clearInterval(intervalId);
