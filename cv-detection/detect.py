@@ -18,17 +18,17 @@ from ultralytics import YOLO
 ZONE_CONFIGS = {
     "gate4": {
         "name": "Gate 4 Entrance",
-        "rect": [10, 10, 250, 420],      # [x_min, y_min, x_max, y_max]
+        "rect": [50, 300, 1200, 1950],      # [x_min, y_min, x_max, y_max] (Left flow area)
         "color": (255, 0, 0),             # BGR Color - Blue
     },
     "courtyard": {
         "name": "Main Courtyard",
-        "rect": [260, 10, 500, 420],     # [x_min, y_min, x_max, y_max]
+        "rect": [1250, 300, 2500, 1950],     # [x_min, y_min, x_max, y_max] (Middle flow area)
         "color": (0, 255, 0),             # BGR Color - Green
     },
     "mainpath": {
         "name": "Main Path",
-        "rect": [510, 10, 750, 420],     # [x_min, y_min, x_max, y_max]
+        "rect": [2550, 300, 3750, 1950],     # [x_min, y_min, x_max, y_max] (Right flow area)
         "color": (0, 0, 255),             # BGR Color - Red
     }
 }
