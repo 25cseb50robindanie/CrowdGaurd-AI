@@ -36,9 +36,9 @@ export default function App() {
             );
             setZones(dashboardZones);
 
-            // Automatically trigger the critical alert modal if Platform 1 (gate4) becomes red
-            const platform1Zone = data.zones.find(z => z.zone_id === 'gate4');
-            if (platform1Zone && platform1Zone.status === 'red') {
+            // Automatically trigger the critical alert modal if Platform 2 (courtyard) becomes red
+            const platform2Zone = data.zones.find(z => z.zone_id === 'courtyard');
+            if (platform2Zone && platform2Zone.status === 'red') {
               setShowCriticalAlert(true);
             }
             
@@ -118,10 +118,10 @@ export default function App() {
 
   // Triggered when clicking Analyze inside Critical Alert Modal
   const handleViewCriticalDetails = () => {
-    // Find the Gate 4 red alert from alerts array
-    const gate4Alert = alerts.find((a) => a.zoneId === 'gate4') || alerts[0];
+    // Find the Courtyard red alert from alerts array
+    const courtyardAlert = alerts.find((a) => a.zoneId === 'courtyard') || alerts[0];
     setShowCriticalAlert(false);
-    setAnalyzeAlert(gate4Alert);
+    setAnalyzeAlert(courtyardAlert);
   };
 
   return (
@@ -175,8 +175,8 @@ export default function App() {
           isOpen={showCriticalAlert}
           onClose={() => setShowCriticalAlert(false)}
           onDispatch={() => {
-            const gate4Alert = alerts.find((a) => a.zoneId === 'gate4') || alerts[0];
-            handleDispatch(gate4Alert);
+            const courtyardAlert = alerts.find((a) => a.zoneId === 'courtyard') || alerts[0];
+            handleDispatch(courtyardAlert);
             setShowCriticalAlert(false);
           }}
           onViewDetails={handleViewCriticalDetails}
