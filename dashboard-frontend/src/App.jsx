@@ -30,7 +30,11 @@ export default function App() {
         })
         .then((data) => {
           if (data && data.zones) {
-            setZones(data.zones);
+            // Filter to only display the 3 active dashboard zones: gate4, courtyard, mainpath
+            const dashboardZones = data.zones.filter(z => 
+              z.zone_id === 'gate4' || z.zone_id === 'courtyard' || z.zone_id === 'mainpath'
+            );
+            setZones(dashboardZones);
             
             // Map the new zone status and messages directly to update our active alerts stream
             setAlerts((prevAlerts) => {
