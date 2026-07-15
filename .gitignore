@@ -12,3 +12,7 @@ CGAssests/
 
 # CV Processed Video Loops
 dashboard-frontend/public/assets/cameras/*_processed.mp4
+
+# CV Output JSONs
+cv-detection/cv_output_courtyard.json
+cv-detection/cv_output_gate4.json
