@@ -17,18 +17,18 @@ from ultralytics import YOLO
 # Zone IDs must match exactly what Person B and Person C expect.
 ZONE_CONFIGS = {
     "gate4": {
-        "name": "Gate 4 Entrance",
-        "rect": [50, 300, 1200, 1950],      # [x_min, y_min, x_max, y_max] (Left flow area)
+        "name": "Platform 1",
+        "rect": [2550, 0, 3750, 2160],      # Swapped to right side (where the crowd converges) & full Y height
         "color": (255, 0, 0),             # BGR Color - Blue
     },
     "courtyard": {
-        "name": "Main Courtyard",
-        "rect": [1250, 300, 2500, 1950],     # [x_min, y_min, x_max, y_max] (Middle flow area)
+        "name": "Platform 2",
+        "rect": [1250, 0, 2500, 2160],     # Middle flow area & full Y height
         "color": (0, 255, 0),             # BGR Color - Green
     },
     "mainpath": {
         "name": "Main Path",
-        "rect": [2550, 300, 3750, 1950],     # [x_min, y_min, x_max, y_max] (Right flow area)
+        "rect": [50, 0, 1200, 2160],       # Swapped to left side & full Y height
         "color": (0, 0, 255),             # BGR Color - Red
     }
 }
