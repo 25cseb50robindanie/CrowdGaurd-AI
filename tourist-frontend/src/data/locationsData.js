@@ -11,13 +11,12 @@ export const mockLocations = [
     volumeText: "Low Volume",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBvINusVSo4Vn63zE_YYpDMxl4y3D9Z1qeUVX4Hxk7zCOHHLIi-zte8oaP64qsj6phrDdXq9Jb9BGuLDm2lEnW0tAMFkV4JyuO8EB5EQsDUECJ8lB-bqasr8H9znRwv1WzfHOqvwDcMJWpbLSCgPcq-zbn_thCiTJ1IvEgwfzZAhv2zZLYhtzBbtUxyfoOJUcxIoPZ7e9LE8a62MFrbvxQ30r1EFulgKAy0orJIxCuRZgGq7q3BVb9CwUlml-LCwfpDwgDJqZKNOqE",
     description: "A major urban transit hub serving thousands of daily commuters. Layout features multiple tracks, access walkways, and central ticketing entrances.",
-    zones: ["courtyard", "mainpath", "gate4"], // Platform 1 (courtyard), Platform 2 (mainpath), Main Entrance (gate4)
+    zones: ["gate4", "courtyard"], // Platform 1 (gate4), Platform 2 (courtyard)
     mapConfig: {
       backgroundImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuDXDa5D5zfMmSLlb1QNkigc1p7elMEeH1cIQuBm0_2rUH_Y0dapxD9lLkhu_YiICa_4IsQSOQIO8b6finY2DhG3wNFalaadLeouNHVSb5gbl_QZE2K6VSWf3dzQNnYsWzzzlGg3Q0XfLNNR0GF-nG5XgnzoLaaMpOeHh_qP7gcBAeNiWYhYwi0RbtKOmyR6fwXC90P5dHLL6bpS-oKLWTK3im1Cz-tDaWbVSLC8R-kn0AGHEt8bu-ES0q31cb4DRnblQIjQEpTBQ7Y",
       hotspots: [
-        { zoneId: "courtyard", label: "Platform 1", top: "25%", left: "33%" },
-        { zoneId: "mainpath", label: "Platform 2", top: "67%", left: "75%" },
-        { zoneId: "gate4", label: "Main Entrance", top: "50%", left: "66%" }
+        { zoneId: "gate4", label: "Platform 1", top: "25%", left: "33%" },
+        { zoneId: "courtyard", label: "Platform 2", top: "67%", left: "75%" }
       ]
     }
   },

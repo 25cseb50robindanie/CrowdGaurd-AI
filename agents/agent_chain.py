@@ -11,35 +11,51 @@ logger = logging.getLogger("agent_chain")
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
+if api_key and not api_key.startswith("your_") and not api_key.startswith("AQ."):
     genai.configure(api_key=api_key)
     logger.info("Google Generative AI configured with API key.")
 else:
-    logger.warning("No GEMINI_API_KEY found in environment. Relying on fallback mechanisms.")
+    api_key = None
+    logger.warning("No valid GEMINI_API_KEY found in environment. Relying on fallback mechanisms.")
 
-def predict_risk(zone_id: str, person_count: int, density: float, trend: str) -> dict:
+def predict_risk(zone_id: str, person_count: int, density: float, trend: str, 
+                 rolling_average: float, growth_rate: float, sustained_congestion_sec: float,
+                 speed: float, stagnation_index: float, predicted_risk: str, 
+                 time_to_risk: float, prediction_message: str, confidence: float) -> dict:
     """
-    Prediction Agent: Analyzes density and trend to predict risk level and time estimate.
-    Returns: {"risk_level": "low"|"medium"|"high", "prediction": "Prediction message"}
+    Prediction Agent: Interprets the deterministic prediction engine results and confidence scores.
     """
     system_instruction = (
-        "You are a Crowd Safety Prediction Agent. Your task is to analyze the density and "
-        "trend of a specific zone in a crowd-monitored area and predict the safety risk.\n\n"
-        "Risk levels criteria:\n"
-        "- 'high' risk: Density >= 4.0 or (Density >= 3.0 and Trend is 'rising').\n"
-        "- 'medium' risk: Density between 2.0 and 4.0 (exclusive), or (Density >= 1.5 and Trend is 'rising').\n"
-        "- 'low' risk: Density < 2.0 with 'stable' or 'falling' trends.\n\n"
+        "You are a Crowd Safety Prediction Agent. Your task is to analyze the density, trend, "
+        "rolling average, movement speed, and prediction confidence of a specific zone, and "
+        "interpret the deterministic prediction provided to you. Do NOT invent new risk metrics. "
+        "Translate the deterministic risk assessment, prediction message, and confidence score into "
+        "a professional operator alert warning.\n\n"
         "Your output must be a valid JSON object matching the following structure:\n"
         "{\n"
         "  \"risk_level\": \"high\" | \"medium\" | \"low\",\n"
-        "  \"prediction\": \"A short prediction message estimating the time until it becomes unsafe, e.g., 'Gate 4 likely unsafe within 8 minutes' or 'Courtyard expected to remain safe'.\"\n"
+        "  \"prediction\": \"A professional alert statement detailing the prediction (e.g. 'Platform 1 is at high risk, expected to exceed capacity within 45 seconds with 85% confidence.').\"\n"
         "}"
     )
 
-    prompt = f"Zone: {zone_id}\nPerson Count: {person_count}\nDensity: {density}\nTrend: {trend}"
+    prompt = (
+        f"Zone: {zone_id}\n"
+        f"Person Count: {person_count}\n"
+        f"Density: {density}\n"
+        f"Trend: {trend}\n"
+        f"Rolling Average: {rolling_average}\n"
+        f"Growth Rate: {growth_rate} p/s\n"
+        f"Sustained Congestion: {sustained_congestion_sec}s\n"
+        f"Movement Speed: {speed if speed >= 0 else 'N/A'}\n"
+        f"Stagnation Index: {stagnation_index if stagnation_index >= 0 else 'N/A'}\n"
+        f"Deterministic Predicted Risk: {predicted_risk}\n"
+        f"Deterministic Estimated Time until risk: {time_to_risk} seconds\n"
+        f"Deterministic Prediction Message: {prediction_message}\n"
+        f"Measured Confidence: {int(confidence * 100)}%"
+    )
 
     if not api_key:
-        return _predict_risk_fallback(zone_id, person_count, density, trend, "Missing API Key")
+        return _predict_risk_fallback(zone_id, predicted_risk, prediction_message, confidence, "Missing API Key")
 
     try:
         model = genai.GenerativeModel(
@@ -51,37 +67,29 @@ def predict_risk(zone_id: str, person_count: int, density: float, trend: str) ->
         return json.loads(response.text.strip())
     except Exception as e:
         logger.error(f"Prediction Agent failed: {e}. Using rule-based fallback.")
-        return _predict_risk_fallback(zone_id, person_count, density, trend, str(e))
+        return _predict_risk_fallback(zone_id, predicted_risk, prediction_message, confidence, str(e))
 
-def _predict_risk_fallback(zone_id: str, person_count: int, density: float, trend: str, reason: str) -> dict:
-    # Rule-based fallback for predictability and testing during quota exhaustion
-    risk = "low"
-    if density >= 4.0 or (density >= 3.0 and trend == "rising"):
-        risk = "high"
-    elif density >= 2.0 or (density >= 1.5 and trend == "rising"):
-        risk = "medium"
-        
-    time_est = "within 8 minutes" if risk == "high" else "within 20 minutes" if risk == "medium" else "safe"
-    pred = f"{zone_id.capitalize()} likely unsafe {time_est}" if risk != "low" else f"{zone_id.capitalize()} expected to remain safe"
-    
+def _predict_risk_fallback(zone_id: str, predicted_risk: str, prediction_message: str, confidence: float, reason: str) -> dict:
     return {
-        "risk_level": risk,
-        "prediction": pred,
+        "risk_level": predicted_risk,
+        "prediction": f"{zone_id.capitalize()} risk is {predicted_risk.upper()} ({int(confidence * 100)}% confidence). {prediction_message}.",
         "fallback": True,
         "fallback_reason": reason
     }
 
-def recommend_mitigation(zone_id: str, density: float, trend: str, prediction: str, risk_level: str) -> dict:
+def recommend_mitigation(zone_id: str, density: float, trend: str, prediction: str, 
+                         risk_level: str, growth_rate: float, sustained_congestion_sec: float,
+                         speed: float, stagnation_index: float, confidence: float) -> dict:
     """
-    Recommendation Agent: Suggests actionable crowd-control mitigation steps.
-    Returns: {"recommendation": "Recommendation message"}
+    Recommendation Agent: Suggests actionable crowd-control mitigation steps based on all metrics.
     """
     system_instruction = (
         "You are a Crowd Management Recommendation Agent. Your task is to recommend concrete, "
-        "actionable steps to mitigate crowd risks based on the zone metrics and the prediction.\n\n"
+        "actionable steps to mitigate crowd risks based on the zone metrics, trend, growth rate, "
+        "sustained congestion, speed, stagnation, and safety prediction. Recommend operations under 10 words.\n\n"
         "Output must be a valid JSON object matching this structure:\n"
         "{\n"
-        "  \"recommendation\": \"A short, concrete mitigation recommendation (e.g. 'Open Gate 6, redirect incoming queue' or 'Continue normal monitoring'). Keep it highly actionable and under 10 words.\"\n"
+        "  \"recommendation\": \"A short, concrete mitigation recommendation (e.g. 'Open Gate 6, redirect incoming queue' or 'Continue normal monitoring').\"\n"
         "}"
     )
 
@@ -89,12 +97,17 @@ def recommend_mitigation(zone_id: str, density: float, trend: str, prediction: s
         f"Zone: {zone_id}\n"
         f"Density: {density}\n"
         f"Trend: {trend}\n"
+        f"Growth Rate: {growth_rate} p/s\n"
+        f"Sustained Congestion: {sustained_congestion_sec}s\n"
+        f"Movement Speed: {speed if speed >= 0 else 'N/A'}\n"
+        f"Stagnation Index: {stagnation_index if stagnation_index >= 0 else 'N/A'}\n"
         f"Prediction: {prediction}\n"
-        f"Risk Level: {risk_level}"
+        f"Risk Level: {risk_level}\n"
+        f"Confidence: {int(confidence * 100)}%"
     )
 
     if not api_key:
-        return _recommend_mitigation_fallback(zone_id, density, trend, prediction, risk_level, "Missing API Key")
+        return _recommend_mitigation_fallback(zone_id, risk_level, "Missing API Key")
 
     try:
         model = genai.GenerativeModel(
@@ -106,28 +119,34 @@ def recommend_mitigation(zone_id: str, density: float, trend: str, prediction: s
         return json.loads(response.text.strip())
     except Exception as e:
         logger.error(f"Recommendation Agent failed: {e}. Using rule-based fallback.")
-        return _recommend_mitigation_fallback(zone_id, density, trend, prediction, risk_level, str(e))
+        return _recommend_mitigation_fallback(zone_id, risk_level, str(e))
 
-def _recommend_mitigation_fallback(zone_id: str, density: float, trend: str, prediction: str, risk_level: str, reason: str) -> dict:
+def _recommend_mitigation_fallback(zone_id: str, risk_level: str, reason: str) -> dict:
     if risk_level == "high":
-        rec = f"Open adjacent gates, redirect incoming queue away from {zone_id}"
+        rec = f"Open adjacent exits, redirect incoming passengers away from {zone_id}"
     elif risk_level == "medium":
-        rec = f"Slow down incoming entry, deploy staff to monitor {zone_id}"
+        rec = f"Slow down incoming flow, deploy staff to monitor {zone_id}"
     else:
         rec = "Continue normal monitoring"
     return {"recommendation": rec, "fallback": True, "fallback_reason": reason}
 
-def explain_reasoning(zone_id: str, person_count: int, density: float, trend: str, prediction: str, recommendation: str, risk_level: str) -> dict:
+def explain_reasoning(zone_id: str, person_count: int, density: float, trend: str, 
+                      prediction: str, recommendation: str, risk_level: str,
+                      rolling_average: float, growth_rate: float, sustained_congestion_sec: float,
+                      speed: float, stagnation_index: float, confidence: float) -> dict:
     """
     Explanation Agent: Turns the metrics, prediction, and recommendation into a clear, single-sentence explanation.
-    Returns: {"explanation": "Explanation message"}
     """
     system_instruction = (
         "You are a Crowd Safety Explanation Agent. Your task is to explain why the risk level was determined "
-        "and why the recommendation is appropriate, in a single clear, plain-language sentence.\n\n"
+        "and why the recommendation is appropriate, in a single clear, plain-language sentence. You MUST cite "
+        "the actual computed metrics (person count, density, growth rate, rolling average, speed/stagnation) "
+        "as evidence. Be detailed and quantitative rather than generic. Citing percentages and rates is highly encouraged.\n\n"
+        "Good Example:\n"
+        "'Passenger inflow increased by 42% during the last 30 seconds while movement speed dropped below the congestion threshold of 30 px/s. At the current growth rate, the platform is expected to exceed safe capacity in approximately 95 seconds.'\n\n"
         "Output must be a valid JSON object matching this structure:\n"
         "{\n"
-        "  \"explanation\": \"A single-sentence plain-language explanation of the risk, referencing the metrics (e.g., 'Density rising 2x in the last 60 seconds due to converging inflow' or 'Density remains low and stable under current capacity limits').\"\n"
+        "  \"explanation\": \"A single-sentence plain-language explanation of the risk, citing metrics (e.g. 'Density is high at 4.2 with stagnant flow of 12 px/s, requiring flow diversion with 90% confidence.').\"\n"
         "}"
     )
 
@@ -136,13 +155,19 @@ def explain_reasoning(zone_id: str, person_count: int, density: float, trend: st
         f"Person Count: {person_count}\n"
         f"Density: {density}\n"
         f"Trend: {trend}\n"
+        f"Rolling Average: {rolling_average}\n"
+        f"Growth Rate: {growth_rate} p/s\n"
+        f"Sustained Congestion: {sustained_congestion_sec}s\n"
+        f"Speed: {speed if speed >= 0 else 'N/A'}\n"
+        f"Stagnation Index: {stagnation_index if stagnation_index >= 0 else 'N/A'}\n"
         f"Prediction: {prediction}\n"
         f"Recommendation: {recommendation}\n"
-        f"Risk Level: {risk_level}"
+        f"Risk Level: {risk_level}\n"
+        f"Confidence: {int(confidence * 100)}%"
     )
 
     if not api_key:
-        return _explain_reasoning_fallback(zone_id, person_count, density, trend, prediction, recommendation, risk_level, "Missing API Key")
+        return _explain_reasoning_fallback(zone_id, density, trend, growth_rate, speed, risk_level, confidence, "Missing API Key")
 
     try:
         model = genai.GenerativeModel(
@@ -154,33 +179,83 @@ def explain_reasoning(zone_id: str, person_count: int, density: float, trend: st
         return json.loads(response.text.strip())
     except Exception as e:
         logger.error(f"Explanation Agent failed: {e}. Using rule-based fallback.")
-        return _explain_reasoning_fallback(zone_id, person_count, density, trend, prediction, recommendation, risk_level, str(e))
+        return _explain_reasoning_fallback(zone_id, density, trend, growth_rate, speed, risk_level, confidence, str(e))
 
-def _explain_reasoning_fallback(zone_id: str, person_count: int, density: float, trend: str, prediction: str, recommendation: str, risk_level: str, reason: str) -> dict:
+def _explain_reasoning_fallback(zone_id: str, density: float, trend: str, growth_rate: float, 
+                                speed: float, risk_level: str, confidence: float, reason: str) -> dict:
+    speed_desc = f" while movement speed dropped to {speed:.1f} px/s" if speed >= 0 else ""
+    growth_desc = f"crowd growth rate of {growth_rate:+.2f} people/sec" if growth_rate != 0 else "stable crowd flow"
+    
     if risk_level == "high":
-        exp = f"Density has reached critical level ({density}) with a {trend} trend, requiring immediate flow diversion."
+        exp = (f"Platform {zone_id.capitalize()} is at high risk because crowd density reached {density:.2f} "
+               f"with a {trend} trend and {growth_desc}{speed_desc}. Emergency flow diversion is recommended "
+               f"({int(confidence*100)}% confidence).")
     elif risk_level == "medium":
-        exp = f"Moderate crowd build-up detected ({density}) showing a {trend} trend; monitoring is advised."
+        exp = (f"Platform {zone_id.capitalize()} is at medium risk as crowd density reached {density:.2f} "
+               f"with a {trend} trend ({growth_desc}). Deploy staff to monitor flow and control gates "
+               f"({int(confidence*100)}% confidence).")
     else:
-        exp = f"Crowd density ({density}) remains low and stable under current limits."
+        exp = (f"Platform {zone_id.capitalize()} crowd density ({density:.2f}) remains low and stable under current limits, "
+               f"with normal walking speed of {speed:.1f} px/s if active ({int(confidence*100)}% confidence).")
     return {"explanation": exp, "fallback": True, "fallback_reason": reason}
 
-def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str) -> dict:
+def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str,
+                    rolling_average: float, growth_rate: float, sustained_congestion_sec: float,
+                    speed: float, stagnation_index: float, predicted_risk: str,
+                    time_to_risk: float, prediction_message: str, confidence: float) -> dict:
     """
     Chains the Prediction, Recommendation, and Explanation agents for a single zone.
-    Returns a dictionary matching Person B's output contract.
     """
     # 1. Prediction Agent
-    pred_res = predict_risk(zone_id, person_count, density, trend)
-    risk_level = pred_res.get("risk_level", "low")
+    pred_res = predict_risk(
+        zone_id=zone_id,
+        person_count=person_count,
+        density=density,
+        trend=trend,
+        rolling_average=rolling_average,
+        growth_rate=growth_rate,
+        sustained_congestion_sec=sustained_congestion_sec,
+        speed=speed,
+        stagnation_index=stagnation_index,
+        predicted_risk=predicted_risk,
+        time_to_risk=time_to_risk,
+        prediction_message=prediction_message,
+        confidence=confidence
+    )
+    risk_level = pred_res.get("risk_level", predicted_risk)
     prediction = pred_res.get("prediction", "")
 
     # 2. Recommendation Agent
-    rec_res = recommend_mitigation(zone_id, density, trend, prediction, risk_level)
+    rec_res = recommend_mitigation(
+        zone_id=zone_id,
+        density=density,
+        trend=trend,
+        prediction=prediction,
+        risk_level=risk_level,
+        growth_rate=growth_rate,
+        sustained_congestion_sec=sustained_congestion_sec,
+        speed=speed,
+        stagnation_index=stagnation_index,
+        confidence=confidence
+    )
     recommendation = rec_res.get("recommendation", "")
 
     # 3. Explanation Agent
-    exp_res = explain_reasoning(zone_id, person_count, density, trend, prediction, recommendation, risk_level)
+    exp_res = explain_reasoning(
+        zone_id=zone_id,
+        person_count=person_count,
+        density=density,
+        trend=trend,
+        prediction=prediction,
+        recommendation=recommendation,
+        risk_level=risk_level,
+        rolling_average=rolling_average,
+        growth_rate=growth_rate,
+        sustained_congestion_sec=sustained_congestion_sec,
+        speed=speed,
+        stagnation_index=stagnation_index,
+        confidence=confidence
+    )
     explanation = exp_res.get("explanation", "")
 
     return {
@@ -192,7 +267,6 @@ def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str)
     }
 
 if __name__ == "__main__":
-    # Self-test when run directly
     print("Testing Agent Chain locally...")
-    result = run_agent_chain("gate4", 42, 4.2, "rising")
+    result = run_agent_chain("gate4", 30, 4.2, "rising", 25.5, 1.2, 5.0, 15.2, 1.0, "high", 10.0, "Likely unsafe in 10s", 0.85)
     print(json.dumps(result, indent=2))

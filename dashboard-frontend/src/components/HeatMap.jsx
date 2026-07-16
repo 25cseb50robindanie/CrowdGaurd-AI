@@ -1,61 +1,71 @@
 import React, { useState, useEffect } from 'react';
 
-export default function HeatMap() {
-  // Let's model the 24 tiles (6 columns x 4 rows)
-  // Each tile has a base styling representing the Heat Signatures
-  const initialTiles = [
-    { id: 0, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    { id: 1, style: 'bg-primary/20 border border-primary/20' },
-    { id: 2, style: 'bg-primary/40 border border-primary/30' },
-    { id: 3, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    { id: 4, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    { id: 5, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    
-    { id: 6, style: 'bg-primary/20 border border-primary/20' },
-    { id: 7, style: 'bg-error/60 border border-error/40 animate-pulse' },
-    { id: 8, style: 'bg-error risk-pulse' },
-    { id: 9, style: 'bg-primary/60 border border-primary/40' },
-    { id: 10, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    { id: 11, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    
-    { id: 12, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    { id: 13, style: 'bg-primary/40 border border-primary/30' },
-    { id: 14, style: 'bg-primary/60 border border-primary/40' },
-    { id: 15, style: 'bg-primary/20 border border-primary/20' },
-    { id: 16, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    { id: 17, style: 'bg-surface-container-highest/30 border border-outline-variant/10' },
-    
-    { id: 18, style: 'bg-surface-container-lowest border border-outline-variant/5' },
-    { id: 19, style: 'bg-surface-container-lowest border border-outline-variant/5' },
-    { id: 20, style: 'bg-primary/20 border border-primary/20' },
-    { id: 21, style: 'bg-surface-container-lowest border border-outline-variant/5' },
-    { id: 22, style: 'bg-surface-container-lowest border border-outline-variant/5' },
-    { id: 23, style: 'bg-surface-container-lowest border border-outline-variant/5' }
-  ];
+export default function HeatMap({ zones }) {
+  // Safe default zone states
+  const gate4Zone = zones ? zones.find(z => z.zone_id === 'gate4') : null;
+  const gate4Status = gate4Zone ? gate4Zone.status : 'green';
 
-  const [tiles, setTiles] = useState(initialTiles);
+  const courtyardZone = zones ? zones.find(z => z.zone_id === 'courtyard') : null;
+  const courtyardStatus = courtyardZone ? courtyardZone.status : 'green';
+
+  const mainpathZone = zones ? zones.find(z => z.zone_id === 'mainpath') : null;
+  const mainpathStatus = mainpathZone ? mainpathZone.status : 'green';
+
+  // Tile index to style mapping helper
+  const getTileStyle = (tileId) => {
+    // 1. Platform 1 (gate4) center-left hotspot
+    if ([7, 8, 13, 14].includes(tileId)) {
+      if (gate4Status === 'red') return 'bg-error/80 border border-error/50 animate-pulse shadow-inner';
+      if (gate4Status === 'amber') return 'bg-amber-500/80 border border-amber-500/50 animate-pulse';
+      return 'bg-primary/40 border border-primary/30';
+    }
+    
+    // 2. Platform 2 (courtyard) top-left/center hotspot
+    if ([1, 2, 6, 12].includes(tileId)) {
+      if (courtyardStatus === 'red') return 'bg-error/80 border border-error/50 animate-pulse shadow-inner';
+      if (courtyardStatus === 'amber') return 'bg-amber-500/80 border border-amber-500/50 animate-pulse';
+      return 'bg-primary/35 border border-primary/25';
+    }
+
+    // 3. Platform 3 (mainpath) right-center hotspot
+    if ([3, 9, 10, 15, 16].includes(tileId)) {
+      if (mainpathStatus === 'red') return 'bg-error/80 border border-error/50 animate-pulse shadow-inner';
+      if (mainpathStatus === 'amber') return 'bg-amber-500/80 border border-amber-500/50 animate-pulse';
+      return 'bg-primary/30 border border-primary/20';
+    }
+
+    // 4. Background baseline activity
+    if ([0, 4, 5, 11, 17, 20].includes(tileId)) {
+      return 'bg-primary/15 border border-primary/10';
+    }
+
+    // 5. Calm inactive boundaries
+    return 'bg-surface-container-lowest border border-outline-variant/10';
+  };
+
+  // State to track minor noise/fluctuations for aesthetics
+  const [opacities, setOpacities] = useState({});
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      // Pick a random tile and update its opacity
-      setTiles(prevTiles => {
-        const randomIndex = Math.floor(Math.random() * prevTiles.length);
-        return prevTiles.map((tile, idx) => {
-          if (idx === randomIndex) {
-            // Random opacity between 0.4 and 1.0
-            const opacity = (Math.random() * 0.6 + 0.4).toFixed(2);
-            return {
-              ...tile,
-              opacity: parseFloat(opacity)
-            };
-          }
-          return tile;
-        });
-      });
-    }, 1500);
+    const interval = setInterval(() => {
+      // Pick a random tile to fluctuate opacity slightly
+      const randomIdx = Math.floor(Math.random() * 24);
+      const randomOpacity = (Math.random() * 0.4 + 0.6).toFixed(2); // 0.6 to 1.0
+      setOpacities(prev => ({
+        ...prev,
+        [randomIdx]: parseFloat(randomOpacity)
+      }));
+    }, 1000);
 
-    return () => clearInterval(timer);
+    return () => clearInterval(interval);
   }, []);
+
+  // Build 24 tiles (6 cols x 4 rows)
+  const tiles = Array.from({ length: 24 }, (_, i) => ({
+    id: i,
+    style: getTileStyle(i),
+    opacity: opacities[i] ?? 1.0
+  }));
 
   return (
     <div className="bg-surface-container border border-outline-variant rounded p-5">
@@ -67,8 +77,8 @@ export default function HeatMap() {
         {tiles.map((tile) => (
           <div
             key={tile.id}
-            className={`${tile.style} rounded-sm transition-opacity duration-700`}
-            style={{ opacity: tile.opacity ?? 1 }}
+            className={`${tile.style} rounded-sm transition-all duration-700`}
+            style={{ opacity: tile.opacity }}
           />
         ))}
       </div>

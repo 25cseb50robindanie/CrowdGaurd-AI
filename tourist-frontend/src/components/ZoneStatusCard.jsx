@@ -22,11 +22,11 @@ export default function ZoneStatusCard({ zone, label, isHighlighted }) {
   // Map zone IDs to their specific mock public images from Stitch
   const getZoneThumbnail = (id) => {
     switch (id) {
-      case 'courtyard': // Platform 1
+      case 'gate4': // Platform 1
         return 'https://lh3.googleusercontent.com/aida-public/AB6AXuCIHSbCvUy7lGwnOvFBZOmUYV_-cnv04zKNxbRnOcAdts26XdFwaFK-NJbZjowJ7GYWmSIsPh1OGqbaTuMMOgv4cH1V63LSt3F4iMPHIczqgAZvZs5fPZDg8_39-n1OrjLjrqhqrHad0sek0SrMqXH1YeqA_WY_qqE5b2x2L4J0ITBAxP2ghbVh_btm9uwPT1wDc7XQOG_s_koHfwh5m0C8KAcc-csZxtM70nnY-3q7vmKSGJglwQnvvDRLAcrgXIu7ADXvXBGLqlA';
-      case 'mainpath': // Platform 2
+      case 'courtyard': // Platform 2
         return 'https://lh3.googleusercontent.com/aida-public/AB6AXuC9zjhJ4bZcBNVbI71GL6fPF23HCn3eU4xSwITkYZVKbFiX6eohXe346Z1BFeahwfd3aVqkkdYi4SSuIJInK1aKEMk4yTOaG4l4tm3o54LzpPsz6h7Q8x-6Byo9kwtmC5RRGBlFGQAnQQwvz0DAj6DgCqHbCw-3mX54gDkwSKoucWHMmfhguTHp-PCdOFTPEStn1Z8mvAVK5B2gRrX1q_adqS4XpY8elEHYdq1XxpExi1_EZb75vJcdDizeJfeanWikQ8QRZaCO-WM';
-      case 'gate4': // Main Entrance
+      case 'mainpath': // Platform 3
         return 'https://lh3.googleusercontent.com/aida-public/AB6AXuCYdSpFcLvynk62miRSidlaf_ZhqzD1zNCsNBo6PtA5WeoHQw-agCoRxDGTCD0ufzju7fqIYnhOdArT4A28PD2MeGGNLhk0dkdCYNptWFFVP6i3dQbxLKPT4vYxQOZiBmK__rZzfN2lGGPg8uxNuR7V8DCpBUjzhLAeDxNyy7QHQBYVufuEypp0VFdK1csYfYOahw2gu3Pal3k4FYHIBUL9fTXtkk0U9kW1O1SNP8E8Y2uRAuGMakhZUuinnpMe7X-hATrZoRWWTg4';
       
       // Fallback for other locations

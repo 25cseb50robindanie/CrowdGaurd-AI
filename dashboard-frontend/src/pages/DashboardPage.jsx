@@ -17,6 +17,7 @@ export default function DashboardPage({
   dispatchLogs,
   onAnalyzeAlert,
   onDispatchAlert,
+  onLinkCameraClick,
 }) {
   const navigate = useNavigate();
 
@@ -52,8 +53,9 @@ export default function DashboardPage({
       {/* Camera Selection Row */}
       <CameraPanel
         cameras={cameras}
-        activeCameraId={activeCamera.id}
+        activeCameraId={activeCamera ? activeCamera.id : null}
         onSelectCamera={setActiveCamera}
+        onLinkCameraClick={onLinkCameraClick}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
@@ -61,12 +63,18 @@ export default function DashboardPage({
         {/* Main Video & Analytics Panel (Left 8 cols) */}
         <div className="lg:col-span-8 flex flex-col space-y-gutter">
           {/* Main Video Panel */}
-          <VideoPlayer camera={activeCamera} />
+          {activeCamera ? (
+            <VideoPlayer camera={activeCamera} />
+          ) : (
+            <div className="aspect-video bg-surface-container border-2 border-outline-variant flex items-center justify-center text-on-surface-variant font-bold text-lg">
+              No Camera Stream Available
+            </div>
+          )}
 
           {/* Two-Column Analytics Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
             <DensityPanel zones={zones} />
-            <HeatMap />
+            <HeatMap zones={zones} />
           </div>
         </div>
 

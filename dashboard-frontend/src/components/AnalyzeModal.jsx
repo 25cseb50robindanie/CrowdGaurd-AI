@@ -33,11 +33,15 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
 
   // Set default metadata if not provided
   const metadata = alert.aiMetadata || {
-    congestion: "92.4%",
-    count: "1,248",
-    flowRate: "8.2 p/s",
-    streamId: "CG-V-00912",
-    integrity: { engine: "LATENCY 42ms", link: "NOMINAL" }
+    congestion: "0%",
+    count: "0",
+    flowRate: "0.0 p/s",
+    streamId: `CG-V-${alert.zoneId ? alert.zoneId.toUpperCase() : "UNKNOWN"}`,
+    prediction: "No prediction data",
+    explanation: "No explanation data",
+    recommendation: "Continue normal monitoring",
+    confidence: "100%",
+    integrity: { engine: "LATENCY 38ms", link: "NOMINAL" }
   };
 
   const isRed = alert.riskLevel === 'red';
@@ -166,41 +170,116 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
 
           {/* Analysis Sidebar (Right) */}
           <aside className="flex-1 lg:max-w-[400px] bg-surface-container flex flex-col divide-y divide-outline-variant lg:h-full lg:overflow-y-auto">
-            {/* Density Stats Section */}
-            <section className="p-6">
+            {/* Density Analytics Section */}
+            <section className="p-6 border-b border-outline-variant">
               <div className="flex items-center justify-between mb-4">
                 <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">Density Analytics</span>
                 <span className="material-symbols-outlined text-primary">analytics</span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-surface-container-low border border-outline-variant rounded">
-                  <p className="font-label-caps text-[10px] text-on-surface-variant uppercase mb-1">Current Count</p>
-                  <p className="font-data-display text-lg text-primary">{metadata.count}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">YOLO Count</p>
+                  <p className="font-data-display text-base text-primary font-bold">{metadata.count}</p>
                 </div>
-                <div className="p-4 bg-surface-container-low border border-outline-variant rounded">
-                  <p className="font-label-caps text-[10px] text-on-surface-variant uppercase mb-1">Flow Rate</p>
-                  <p className="font-data-display text-lg text-secondary-fixed">
-                    {metadata.flowRate.split(' ')[0]}
-                    <span className="text-xs ml-1">p/s</span>
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Zone Density</p>
+                  <p className="font-data-display text-xs text-on-surface font-semibold">
+                    {alert.density ? alert.density.toFixed(2) : "0.00"} <span className="text-[10px] text-on-surface-variant font-normal">p/m²</span>
                   </p>
                 </div>
               </div>
-              <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Rolling Average</p>
+                  <p className="font-data-display text-xs text-on-surface font-semibold">
+                    {alert.rollingAverage ? alert.rollingAverage.toFixed(1) : "0.0"} <span className="text-[10px] text-on-surface-variant font-normal">avg</span>
+                  </p>
+                </div>
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Rolling Trend</p>
+                  <p className="font-data-display text-xs text-on-surface font-semibold capitalize">
+                    {alert.trend || "Stable"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
                 <div className="flex justify-between items-center text-on-surface">
                   <span className="font-body-md text-xs opacity-80">Saturation Level</span>
                   <span className="font-data-table text-xs text-error font-semibold">{metadata.congestion}</span>
                 </div>
-                <div className="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
                   <div 
-                    className="bg-error h-full" 
+                    className="bg-error h-full transition-all duration-500" 
                     style={{ width: metadata.congestion }}
                   ></div>
                 </div>
               </div>
             </section>
 
+            {/* Movement & Congestion Section */}
+            <section className="p-6 border-b border-outline-variant">
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">Movement & Congestion</span>
+                <span className="material-symbols-outlined text-primary">directions_run</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Growth Rate</p>
+                  <p className="font-data-display text-xs text-on-surface font-semibold">
+                    {metadata.flowRate}
+                  </p>
+                </div>
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Sustained Congestion</p>
+                  <p className="font-data-display text-xs text-on-surface font-semibold">
+                    {alert.sustainedCongestionSec ? alert.sustainedCongestionSec.toFixed(1) : "0.0"}s
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Average Speed</p>
+                  <p className="font-data-display text-xs text-on-surface font-semibold">
+                    {alert.speed && alert.speed >= 0 ? `${alert.speed.toFixed(1)} px/s` : "N/A"}
+                  </p>
+                </div>
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Stagnation Status</p>
+                  <p className="font-data-display text-xs text-on-surface font-bold capitalize">
+                    {alert.stagnationIndex && alert.stagnationIndex > 0.5 ? "Stagnant" : "Moving"}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* AI Agent Analysis Section */}
+            <section className="p-6 border-b border-outline-variant bg-surface-container-low/20">
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">AI Agent Safety Warnings</span>
+                <span className="material-symbols-outlined text-primary">psychology</span>
+              </div>
+              <div className="space-y-3">
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Deterministic Prediction</p>
+                  <p className="font-body-md text-xs text-on-surface leading-relaxed">{metadata.prediction}</p>
+                </div>
+                <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                  <p className="font-label-caps text-[9px] text-on-surface-variant uppercase mb-1">Agent Explanation</p>
+                  <p className="font-body-md text-xs text-on-surface-variant leading-relaxed">{metadata.explanation}</p>
+                </div>
+                <div className="p-3 bg-primary/10 border border-primary/25 rounded">
+                  <p className="font-label-caps text-[9px] text-primary uppercase mb-1">Recommended Response Action</p>
+                  <p className="font-body-md text-xs text-primary font-bold leading-relaxed">{metadata.recommendation}</p>
+                </div>
+                <div className="flex justify-between items-center text-on-surface-variant pt-1">
+                  <span className="font-label-caps text-[9px] uppercase">Confidence</span>
+                  <span className="font-data-table text-[10px] font-bold text-secondary-fixed">{metadata.confidence}</span>
+                </div>
+              </div>
+            </section>
+
             {/* Local Heat Map Section */}
-            <section className="p-6">
+            <section className="p-6 border-b border-outline-variant">
               <div className="flex items-center justify-between mb-4">
                 <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">Local Heat Map</span>
                 <span className="material-symbols-outlined text-on-surface-variant">map</span>
@@ -211,9 +290,8 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
                   className="absolute inset-0 bg-cover bg-center grayscale opacity-40" 
                   style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuB4gSbpz243weAz1l2ktyt2-Adx_aYCFTf5dGKog2cSRKJQ6Vv3H9ijNhUmje2UYjtagQj62_jJvxg9cwmt5W7aZNCoWEhdONWeqmRnoREoVo6Rwl6od4Dbqc0LQjWOHQbvFje4piiSref-BsktMWv2Undl5HU2btVKvz22JaGys9Ktsww2ff5r-GzE_Jpn4a2qwqxqRJgu650BX3OUdLpn3T54VeLo6VN2zqOv4bqHISZDAlEIdtdrAI6olh-Sgzw6latZR9mMQzSR')" }}
                 ></div>
-                {/* Simulated Heatmap pulses */}
-                <div className="absolute top-1/2 left-1/3 w-20 h-20 bg-error/30 rounded-full blur-xl animate-pulse"></div>
-                <div className="absolute top-1/4 right-1/4 w-12 h-12 bg-primary/25 rounded-full blur-md"></div>
+                {/* Simulated Heatmap pulses linked to risk */}
+                <div className={`absolute top-1/2 left-1/3 w-20 h-20 rounded-full blur-xl animate-pulse ${alert.riskLevel === 'red' ? 'bg-error/40' : alert.riskLevel === 'amber' ? 'bg-amber-500/35' : 'bg-primary/20'}`}></div>
                 
                 {/* Crosshair UI */}
                 <div className="absolute inset-0 border border-primary/20 flex items-center justify-center pointer-events-none">

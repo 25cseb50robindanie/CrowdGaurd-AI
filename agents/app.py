@@ -1,21 +1,18 @@
+import os
+import logging
+from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
 from pydantic import BaseModel
-import logging
 from agent_chain import run_agent_chain
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("app")
+logger = logging.getLogger("agent_app")
 
-app = FastAPI(
-    title="CrowdGuardAI Agent Service",
-    description="Gemini-powered crowd prediction, recommendation, and explanation agent service.",
-    version="1.0.0"
-)
+app = FastAPI(title="CrowdGuard AI - Multi-Agent Analysis Service")
 
-# Enable CORS for frontend or cross-origin backend integration
+# CORS middleware config
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,7 +26,16 @@ class ZoneInput(BaseModel):
     zone_id: str
     person_count: int
     density: float
-    trend: str  # "rising", "falling", "stable"
+    trend: str
+    rolling_average: float
+    growth_rate: float
+    sustained_congestion_sec: float
+    speed: float
+    stagnation_index: float
+    predicted_risk: str
+    time_to_risk: float
+    prediction_message: str
+    confidence: float
 
 class CameraInput(BaseModel):
     camera_id: str
@@ -53,7 +59,7 @@ class CameraAnalysisOutput(BaseModel):
 def read_root():
     return {
         "status": "online",
-        "service": "CrowdGuardAI Agent Service",
+        "service": "CrowdGuardAI Crowd Prediction Multi-Agent Service",
         "endpoints": {
             "POST /analyze/camera": "Analyze camera data with multiple zones",
             "POST /analyze/zones": "Analyze a list of zones",
@@ -71,7 +77,16 @@ async def analyze_camera(data: CameraInput):
                 zone_id=zone.zone_id,
                 person_count=zone.person_count,
                 density=zone.density,
-                trend=zone.trend
+                trend=zone.trend,
+                rolling_average=zone.rolling_average,
+                growth_rate=zone.growth_rate,
+                sustained_congestion_sec=zone.sustained_congestion_sec,
+                speed=zone.speed,
+                stagnation_index=zone.stagnation_index,
+                predicted_risk=zone.predicted_risk,
+                time_to_risk=zone.time_to_risk,
+                prediction_message=zone.prediction_message,
+                confidence=zone.confidence
             )
             analyzed_zones.append(analysis)
         except Exception as e:
@@ -94,7 +109,16 @@ async def analyze_zones(zones: List[ZoneInput]):
                 zone_id=zone.zone_id,
                 person_count=zone.person_count,
                 density=zone.density,
-                trend=zone.trend
+                trend=zone.trend,
+                rolling_average=zone.rolling_average,
+                growth_rate=zone.growth_rate,
+                sustained_congestion_sec=zone.sustained_congestion_sec,
+                speed=zone.speed,
+                stagnation_index=zone.stagnation_index,
+                predicted_risk=zone.predicted_risk,
+                time_to_risk=zone.time_to_risk,
+                prediction_message=zone.prediction_message,
+                confidence=zone.confidence
             )
             analyzed_zones.append(analysis)
         except Exception as e:
@@ -111,7 +135,16 @@ async def analyze_single_zone(zone: ZoneInput):
             zone_id=zone.zone_id,
             person_count=zone.person_count,
             density=zone.density,
-            trend=zone.trend
+            trend=zone.trend,
+            rolling_average=zone.rolling_average,
+            growth_rate=zone.growth_rate,
+            sustained_congestion_sec=zone.sustained_congestion_sec,
+            speed=zone.speed,
+            stagnation_index=zone.stagnation_index,
+            predicted_risk=zone.predicted_risk,
+            time_to_risk=zone.time_to_risk,
+            prediction_message=zone.prediction_message,
+            confidence=zone.confidence
         )
         return analysis
     except Exception as e:

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function CameraPanel({ cameras, activeCameraId, onSelectCamera }) {
+export default function CameraPanel({ cameras, activeCameraId, onSelectCamera, onLinkCameraClick }) {
   return (
     <div id="cameras-section" className="grid grid-cols-2 lg:grid-cols-4 gap-gutter scroll-mt-20">
       {cameras.map((cam) => {
@@ -30,8 +30,11 @@ export default function CameraPanel({ cameras, activeCameraId, onSelectCamera })
         );
       })}
       
-      {/* Link Camera placeholder button */}
-      <button className="flex items-center justify-center space-x-2 p-3 border-2 border-dashed border-outline-variant text-on-surface-variant rounded hover:bg-surface-container-high transition-colors">
+      {/* Link Camera button */}
+      <button 
+        onClick={onLinkCameraClick}
+        className="flex items-center justify-center space-x-2 p-3 border-2 border-dashed border-outline-variant text-on-surface-variant rounded hover:bg-surface-container-high transition-colors"
+      >
         <span className="material-symbols-outlined">add_circle</span>
         <span className="font-label-caps text-label-caps">Link Camera</span>
       </button>

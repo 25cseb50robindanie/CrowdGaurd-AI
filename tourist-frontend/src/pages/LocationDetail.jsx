@@ -43,11 +43,10 @@ export default function LocationDetail({ locations, zonesData }) {
     }
   };
 
-  // Maps friendly display names for the zone ids
   const zoneLabels = {
-    gate4: "Main Entrance",
-    courtyard: "Platform 1",
-    mainpath: "Platform 2",
+    gate4: "Platform 1",
+    courtyard: "Platform 2",
+    mainpath: "Platform 3",
     pier1: "East Wing Walk",
     seafoodmarket: "Central Court",
     fountaingrade: "North Checkpoint",

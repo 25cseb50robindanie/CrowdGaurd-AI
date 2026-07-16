@@ -35,17 +35,26 @@ export default function VideoPlayer({ camera }) {
         isFullscreen ? 'w-screen h-screen' : ''
       }`}
     >
-      {/* video element */}
-      <video
-        ref={videoRef}
-        key={camera.streamUrl} // forces re-render/reload when switching camera
-        src={camera.streamUrl}
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="w-full h-full object-cover opacity-60 absolute inset-0"
-      />
+      {/* video element / live MJPEG stream */}
+      {camera.streamUrl && camera.streamUrl.includes('/stream') ? (
+        <img
+          key={camera.streamUrl}
+          src={camera.streamUrl}
+          className="w-full h-full object-cover opacity-80 absolute inset-0"
+          alt="Live Video Stream"
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          key={camera.streamUrl} // forces re-render/reload when switching camera
+          src={camera.streamUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="w-full h-full object-cover opacity-60 absolute inset-0"
+        />
+      )}
 
       {/* AI Bounding Boxes Overlay (Rendered dynamically from swappable Mock Data configuration) */}
       {showAiLayers && camera.boundingBoxes && (
