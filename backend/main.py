@@ -133,11 +133,25 @@ def run_prediction_engine(zone_id: str, person_count: int, density: float, rolli
     # 1. Calculate Risk Score (0.0 to 10.0) based on all available metrics
     density_score = min(density * 2.0, 8.0) # Up to 8.0
     growth_penalty = max(growth_rate * 1.5, 0.0) # Penalty for positive growth
-    stagnation_penalty = 2.0 if (stagnation_index > 0.5 or (speed > 0 and speed < 30.0 and density >= 2.2)) else 0.0
+    
+    # Selective Stagnation Penalty: only penalize when density is high and growth/congestion confirms risk
+    is_stationary = (stagnation_index > 0.5) or (speed > 0 and speed < 30.0)
+    is_congested = is_stationary and (density >= 2.2) and (growth_rate > 0.1 or sustained_congestion_sec >= 15.0)
+    stagnation_penalty = 2.0 if is_congested else 0.0
+    
     congestion_penalty = min(sustained_congestion_sec / 30.0, 2.0)
     capacity_penalty = 1.5 if person_count >= max_capacity else 0.0
     
-    risk_score = min(density_score + growth_penalty + stagnation_penalty + congestion_penalty + capacity_penalty, 10.0)
+    # Stable waiting crowd identification
+    is_stable_waiting = (abs(growth_rate) < 0.5) and (trend in ["stable", "falling"]) and (person_count < max_capacity)
+    
+    if is_stable_waiting:
+        # Scale density impact down by 50% for stable waiting crowds
+        adjusted_density_score = density_score * 0.5
+    else:
+        adjusted_density_score = density_score
+        
+    risk_score = min(adjusted_density_score + growth_penalty + stagnation_penalty + congestion_penalty + capacity_penalty, 10.0)
     
     if risk_score >= 7.0:
         risk = "high"
@@ -211,7 +225,7 @@ def run_prediction_engine(zone_id: str, person_count: int, density: float, rolli
             predicted_risk = "high"
             prediction_message = f"Avoid - Platform has exceeded maximum safe capacity limits ({capacity_usage:.1f}%)."
     else:
-        if stagnation_index > 0.5 or (speed > 0 and speed < 30.0 and density >= 2.2):
+        if is_congested:
             predicted_risk = "medium"
             prediction_message = (f"Caution - Crowd is stagnant (avg speed {speed:.1f} px/s) "
                                   f"with high density ({density:.2f}). Sustained congestion for {int(sustained_congestion_sec)}s.")
@@ -224,7 +238,45 @@ def run_prediction_engine(zone_id: str, person_count: int, density: float, rolli
                 prediction_message = f"Caution - Busy transit area. Density is moderate ({density:.2f}) and stable."
             else:
                 predicted_risk = "low"
-                prediction_message = f"Safe - Crowd counts are stable within margins (capacity usage: {capacity_usage:.1f}%)."
+                if is_stationary:
+                    prediction_message = f"Safe - Stationary waiting crowd is stable (capacity usage: {capacity_usage:.1f}%)."
+                else:
+                    prediction_message = f"Safe - Crowd counts are stable within margins (capacity usage: {capacity_usage:.1f}%)."
+
+    # Determine reason for logging
+    reason = "Normal operations"
+    if predicted_risk == "high":
+        if person_count >= max_capacity:
+            reason = "Maximum safe capacity exceeded"
+        elif growth_rate > 0.0:
+            reason = "Rapid crowd inflow endangering zone capacity"
+        else:
+            reason = "Critically high crowd density"
+    elif predicted_risk == "medium":
+        if growth_rate > 0.0:
+            reason = "Elevated crowd inflow causing growth"
+        elif is_congested:
+            reason = "Congested stagnant crowd detected with sustained occupancy"
+        else:
+            reason = "Moderate busy transit density"
+    else:
+        if is_stationary:
+            reason = "Stationary waiting crowd with stable count. No positive inflow detected."
+        else:
+            reason = "Crowd counts are stable and within safe limits"
+
+    logger.info(
+        f"\n[Prediction]\n"
+        f"zone={zone_id}\n"
+        f"count={person_count}\n"
+        f"density={density:.1f}\n"
+        f"growth={growth_rate:.1f}\n"
+        f"speed={speed:.1f}\n"
+        f"stagnation={stagnation_index:.2f}\n"
+        f"risk_score={risk_score:.1f}\n"
+        f"predicted_risk={predicted_risk}\n"
+        f"reason={reason}"
+    )
 
     return {
         "risk_level": risk,
@@ -259,161 +311,163 @@ def get_live_zones_data() -> List[Zone]:
     prediction engine, coordinates with the Agent server (port 8001), and updates alerts.
     """
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT id, label, max_capacity, zone_id, stream_url FROM cameras WHERE active = 1")
-    cameras_rows = cursor.fetchall()
-    
-    merged_zones = []
-    
-    for cam in cameras_rows:
-        cam_id = cam["id"]
-        zone_id = cam["zone_id"]
-        zone_name = cam["label"]
-        max_capacity = cam["max_capacity"]
-        stream_url = f"http://localhost:8000/api/cameras/{cam_id}/stream"
+    try:
+        cursor = conn.cursor()
         
-        # Query latest live metrics for this camera
-        cursor.execute("""
-            SELECT timestamp, person_count, density, trend, rolling_average, growth_rate, 
-                   sustained_congestion_sec, speed, stagnation_index, average_detection_conf, tracking_stability
-            FROM live_metrics 
-            WHERE camera_id = ? AND zone_id = ?
-        """, (cam_id, zone_id))
-        metric = cursor.fetchone()
+        cursor.execute("SELECT id, label, max_capacity, zone_id, stream_url FROM cameras WHERE active = 1")
+        cameras_rows = cursor.fetchall()
         
-        if not metric:
-            metric = {
-                "timestamp": datetime.now().isoformat(),
-                "person_count": 0,
-                "density": 0.0,
-                "trend": "stable",
-                "rolling_average": 0.0,
-                "growth_rate": 0.0,
-                "sustained_congestion_sec": 0.0,
-                "speed": -1.0,
-                "stagnation_index": -1.0,
-                "average_detection_conf": 1.0,
-                "tracking_stability": 1.0
+        merged_zones = []
+        
+        for cam in cameras_rows:
+            cam_id = cam["id"]
+            zone_id = cam["zone_id"]
+            zone_name = cam["label"]
+            max_capacity = cam["max_capacity"]
+            stream_url = f"http://localhost:8000/api/cameras/{cam_id}/stream"
+            
+            # Query latest live metrics for this camera
+            cursor.execute("""
+                SELECT timestamp, person_count, density, trend, rolling_average, growth_rate, 
+                       sustained_congestion_sec, speed, stagnation_index, average_detection_conf, tracking_stability
+                FROM live_metrics 
+                WHERE camera_id = ? AND zone_id = ?
+            """, (cam_id, zone_id))
+            metric = cursor.fetchone()
+            
+            if not metric:
+                metric = {
+                    "timestamp": datetime.now().isoformat(),
+                    "person_count": 0,
+                    "density": 0.0,
+                    "trend": "stable",
+                    "rolling_average": 0.0,
+                    "growth_rate": 0.0,
+                    "sustained_congestion_sec": 0.0,
+                    "speed": -1.0,
+                    "stagnation_index": -1.0,
+                    "average_detection_conf": 1.0,
+                    "tracking_stability": 1.0
+                }
+                
+            # Run prediction engine
+            pred_res = run_prediction_engine(
+                zone_id=zone_id,
+                person_count=metric["person_count"],
+                density=metric["density"],
+                rolling_average=metric["rolling_average"],
+                growth_rate=metric["growth_rate"],
+                trend=metric["trend"],
+                max_capacity=max_capacity,
+                speed=metric["speed"],
+                stagnation_index=metric["stagnation_index"],
+                sustained_congestion_sec=metric["sustained_congestion_sec"],
+                average_detection_conf=metric["average_detection_conf"],
+                tracking_stability=metric["tracking_stability"]
+            )
+            
+            # Get active alert status from DB
+            cursor.execute("SELECT id, status FROM alerts WHERE zone_id = ?", (zone_id,))
+            alert_row = cursor.fetchone()
+            status_lifecycle = alert_row["status"] if alert_row else "NEW"
+            
+            # Contact AI Agent Server
+            agent_url = "http://127.0.0.1:8001/analyze/zone"
+            agent_payload = {
+                "zone_id": zone_id,
+                "person_count": metric["person_count"],
+                "density": metric["density"],
+                "trend": metric["trend"],
+                "rolling_average": metric["rolling_average"],
+                "growth_rate": metric["growth_rate"],
+                "sustained_congestion_sec": metric["sustained_congestion_sec"],
+                "speed": metric["speed"],
+                "stagnation_index": metric["stagnation_index"],
+                "predicted_risk": pred_res["predicted_risk"],
+                "time_to_risk": pred_res["time_to_risk"],
+                "prediction_message": pred_res["prediction_message"],
+                "confidence": pred_res["confidence"]
             }
             
-        # Run prediction engine
-        pred_res = run_prediction_engine(
-            zone_id=zone_id,
-            person_count=metric["person_count"],
-            density=metric["density"],
-            rolling_average=metric["rolling_average"],
-            growth_rate=metric["growth_rate"],
-            trend=metric["trend"],
-            max_capacity=max_capacity,
-            speed=metric["speed"],
-            stagnation_index=metric["stagnation_index"],
-            sustained_congestion_sec=metric["sustained_congestion_sec"],
-            average_detection_conf=metric["average_detection_conf"],
-            tracking_stability=metric["tracking_stability"]
-        )
-        
-        # Get active alert status from DB
-        cursor.execute("SELECT status FROM alerts WHERE zone_id = ?", (zone_id,))
-        alert_row = cursor.fetchone()
-        status_lifecycle = alert_row["status"] if alert_row else "NEW"
-        
-        # Contact AI Agent Server
-        agent_url = "http://127.0.0.1:8001/analyze/zone"
-        agent_payload = {
-            "zone_id": zone_id,
-            "person_count": metric["person_count"],
-            "density": metric["density"],
-            "trend": metric["trend"],
-            "rolling_average": metric["rolling_average"],
-            "growth_rate": metric["growth_rate"],
-            "sustained_congestion_sec": metric["sustained_congestion_sec"],
-            "speed": metric["speed"],
-            "stagnation_index": metric["stagnation_index"],
-            "predicted_risk": pred_res["predicted_risk"],
-            "time_to_risk": pred_res["time_to_risk"],
-            "prediction_message": pred_res["prediction_message"],
-            "confidence": pred_res["confidence"]
-        }
-        
-        risk_level = pred_res["risk_level"]
-        prediction = pred_res["prediction_message"]
-        recommendation = "Continue normal monitoring"
-        explanation = "Crowd density remains low and stable under current limits."
-        
-        try:
-            response = requests.post(agent_url, json=agent_payload, timeout=2.5)
-            if response.status_code == 200:
-                agent_analysis = response.json()
-                risk_level = agent_analysis.get("risk_level", risk_level)
-                prediction = agent_analysis.get("prediction", prediction)
-                recommendation = agent_analysis.get("recommendation", recommendation)
-                explanation = agent_analysis.get("explanation", explanation)
-            else:
-                logger.warning(f"Agent server failed with status {response.status_code}. Using deterministic fallback.")
-        except Exception as err:
-            logger.warning(f"Agent server connection timed out or offline: {err}. Using deterministic fallback.")
+            risk_level = pred_res["risk_level"]
+            prediction = pred_res["prediction_message"]
+            recommendation = "Continue normal monitoring"
+            explanation = "Crowd density remains low and stable under current limits."
             
-        status = "green"
-        if risk_level == "high":
-            status = "red"
-        elif risk_level == "medium":
-            status = "amber"
+            try:
+                response = requests.post(agent_url, json=agent_payload, timeout=2.5)
+                if response.status_code == 200:
+                    agent_analysis = response.json()
+                    risk_level = agent_analysis.get("risk_level", risk_level)
+                    prediction = agent_analysis.get("prediction", prediction)
+                    recommendation = agent_analysis.get("recommendation", recommendation)
+                    explanation = agent_analysis.get("explanation", explanation)
+                else:
+                    logger.warning(f"Agent server failed with status {response.status_code}. Using deterministic fallback.")
+            except Exception as err:
+                logger.warning(f"Agent server connection timed out or offline: {err}. Using deterministic fallback.")
+                
+            status = "green"
+            if risk_level == "high":
+                status = "red"
+            elif risk_level == "medium":
+                status = "amber"
+                
+            message_str = f"{explanation} Recommendation: {recommendation}"
             
-        message_str = f"{explanation} Recommendation: {recommendation}"
-        
-        alert_id = f"alert_{zone_id}"
-        congestion_percent = f"{int(min((metric['density'] / 4.5) * 100, 100))}%"
-        
-        if status == "green":
-            status_lifecycle = "NEW"
+            alert_id = f"alert_{zone_id}"
+            congestion_percent = f"{int(min((metric['density'] / 4.5) * 100, 100))}%"
             
-        cursor.execute("""
-            INSERT INTO alerts (id, zone_id, zone_name, title, risk_level, timestamp, date_time, 
-                               message, stream_url, status, congestion, count, prediction, 
-                               explanation, recommendation, confidence)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                risk_level=excluded.risk_level,
-                timestamp=excluded.timestamp,
-                message=excluded.message,
-                status=?, 
-                congestion=excluded.congestion,
-                count=excluded.count,
-                prediction=excluded.prediction,
-                explanation=excluded.explanation,
-                recommendation=excluded.recommendation,
-                confidence=excluded.confidence
-        """, (
-            alert_id, zone_id, zone_name, f"{zone_name} Alert", status, "Just now", 
-            metric["timestamp"], message_str, stream_url, status_lifecycle, 
-            congestion_percent, metric["person_count"], prediction, explanation, 
-            recommendation, pred_res["confidence"], status_lifecycle
-        ))
-        
-        merged_zones.append(Zone(
-            zone_id=zone_id,
-            status=status,
-            density=metric["density"],
-            message=message_str,
-            person_count=metric["person_count"],
-            rolling_average=metric["rolling_average"],
-            growth_rate=metric["growth_rate"],
-            sustained_congestion_sec=metric["sustained_congestion_sec"],
-            speed=metric["speed"],
-            stagnation_index=metric["stagnation_index"],
-            predicted_risk=pred_res["predicted_risk"],
-            time_to_risk=pred_res["time_to_risk"],
-            prediction_message=pred_res["prediction_message"],
-            status_lifecycle=status_lifecycle,
-            confidence=pred_res["confidence"],
-            prediction=prediction,
-            recommendation=recommendation,
-            explanation=explanation
-        ))
-        
-    conn.commit()
-    conn.close()
+            if status == "green":
+                status_lifecycle = "NEW"
+                
+            cursor.execute("""
+                INSERT INTO alerts (id, zone_id, zone_name, title, risk_level, timestamp, date_time, 
+                                   message, stream_url, status, congestion, count, prediction, 
+                                   explanation, recommendation, confidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    risk_level=excluded.risk_level,
+                    timestamp=excluded.timestamp,
+                    message=excluded.message,
+                    status=?, 
+                    congestion=excluded.congestion,
+                    count=excluded.count,
+                    prediction=excluded.prediction,
+                    explanation=excluded.explanation,
+                    recommendation=excluded.recommendation,
+                    confidence=excluded.confidence
+            """, (
+                alert_id, zone_id, zone_name, f"{zone_name} Alert", status, "Just now", 
+                metric["timestamp"], message_str, stream_url, status_lifecycle, 
+                congestion_percent, metric["person_count"], prediction, explanation, 
+                recommendation, pred_res["confidence"], status_lifecycle
+            ))
+            
+            merged_zones.append(Zone(
+                zone_id=zone_id,
+                status=status,
+                density=metric["density"],
+                message=message_str,
+                person_count=metric["person_count"],
+                rolling_average=metric["rolling_average"],
+                growth_rate=metric["growth_rate"],
+                sustained_congestion_sec=metric["sustained_congestion_sec"],
+                speed=metric["speed"],
+                stagnation_index=metric["stagnation_index"],
+                predicted_risk=pred_res["predicted_risk"],
+                time_to_risk=pred_res["time_to_risk"],
+                prediction_message=pred_res["prediction_message"],
+                status_lifecycle=status_lifecycle,
+                confidence=pred_res["confidence"],
+                prediction=prediction,
+                recommendation=recommendation,
+                explanation=explanation
+            ))
+            
+        conn.commit()
+    finally:
+        conn.close()
     
     return merged_zones
 
@@ -454,10 +508,12 @@ async def stream_camera(camera_id: str):
 def get_cameras():
     """Returns registered cameras overriding stream URLs dynamically to the live stream endpoint."""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM cameras WHERE active = 1")
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM cameras WHERE active = 1")
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
     
     cameras_list = []
     for r in rows:
@@ -477,15 +533,17 @@ def get_zones() -> ZonesResponse:
 def get_alerts():
     """Returns active alerts from SQLite joined with all live metrics."""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT a.*, m.growth_rate, m.trend, m.density, m.rolling_average, 
-               m.sustained_congestion_sec, m.speed, m.stagnation_index 
-        FROM alerts a 
-        LEFT JOIN live_metrics m ON a.zone_id = m.zone_id
-    """)
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.*, m.growth_rate, m.trend, m.density, m.rolling_average, 
+                   m.sustained_congestion_sec, m.speed, m.stagnation_index 
+            FROM alerts a 
+            LEFT JOIN live_metrics m ON a.zone_id = m.zone_id
+        """)
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
     
     alerts_list = []
     for r in rows:
@@ -532,19 +590,21 @@ def get_alerts():
 @app.post("/api/dispatch", response_model=Dispatch, status_code=201)
 def create_dispatch(payload: DispatchInput) -> Dispatch:
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE alerts SET status = 'DISPATCHED' WHERE zone_id = ?", (payload.zone_id,))
-    cursor.execute("SELECT label FROM cameras WHERE zone_id = ?", (payload.zone_id,))
-    cam_row = cursor.fetchone()
-    zone_name = cam_row["label"] if cam_row else payload.zone_id.capitalize()
-    
-    cursor.execute("""
-        INSERT INTO dispatches (timestamp, zone, message, zone_id)
-        VALUES (?, ?, ?, ?)
-    """, (payload.timestamp, zone_name, payload.message, payload.zone_id))
-    dispatch_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE alerts SET status = 'DISPATCHED' WHERE zone_id = ?", (payload.zone_id,))
+        cursor.execute("SELECT label FROM cameras WHERE zone_id = ?", (payload.zone_id,))
+        cam_row = cursor.fetchone()
+        zone_name = cam_row["label"] if cam_row else payload.zone_id.capitalize()
+        
+        cursor.execute("""
+            INSERT INTO dispatches (timestamp, zone, message, zone_id)
+            VALUES (?, ?, ?, ?)
+        """, (payload.timestamp, zone_name, payload.message, payload.zone_id))
+        dispatch_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
     
     return Dispatch(
         id=dispatch_id,
@@ -557,24 +617,28 @@ def create_dispatch(payload: DispatchInput) -> Dispatch:
 @app.get("/api/dispatches", response_model=List[Dispatch])
 def get_dispatches():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM dispatches ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM dispatches ORDER BY id DESC")
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
     return [Dispatch(**dict(r)) for r in rows]
 
 @app.post("/api/reviews", response_model=Review, status_code=201)
 def create_review(payload: ReviewInput) -> Review:
     conn = get_db_connection()
-    cursor = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO reviews (is_accurate, notes, timestamp)
-        VALUES (?, ?, ?)
-    """, (1 if payload.is_accurate else 0, payload.notes, timestamp))
-    review_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO reviews (is_accurate, notes, timestamp)
+            VALUES (?, ?, ?)
+        """, (1 if payload.is_accurate else 0, payload.notes, timestamp))
+        review_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
     
     return Review(
         id=review_id,
@@ -605,8 +669,8 @@ async def upload_camera(
     stream_url = f"http://localhost:8000/api/cameras/{safe_id}/stream"
 
     conn = get_db_connection()
-    cursor = conn.cursor()
     try:
+        cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO cameras (id, name, label, stream_url, stream_label, max_capacity, zone_id, active)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
@@ -626,9 +690,9 @@ async def upload_camera(
         """, (camera_id, datetime.now().isoformat(), zone_id))
         conn.commit()
     except Exception as db_err:
-        conn.close()
         raise HTTPException(status_code=500, detail=f"Failed to register camera: {db_err}")
-    conn.close()
+    finally:
+        conn.close()
 
     if camera_id in active_processes:
         try:
@@ -648,7 +712,7 @@ async def upload_camera(
         "--camera-id", camera_id,
         "--zone-id", zone_id,
         "--output-json", output_json,
-        "--mode", "both",
+        "--mode", "file",
         "--loop"
     ]
     
@@ -661,6 +725,56 @@ async def upload_camera(
     
     return {"status": "success", "camera_id": camera_id, "stream_url": stream_url}
 
+@app.delete("/api/cameras/{camera_id}")
+async def unlink_camera(camera_id: str):
+    logger.info(f"Unlinking camera: {camera_id}")
+    
+    # 1. Stop YOLO worker process
+    if camera_id in active_processes:
+        try:
+            active_processes[camera_id].terminate()
+            try:
+                active_processes[camera_id].wait(timeout=1.5)
+            except subprocess.TimeoutExpired:
+                active_processes[camera_id].kill()
+            logger.info(f"YOLO worker for {camera_id} stopped.")
+        except Exception as e:
+            logger.error(f"Error terminating YOLO worker for {camera_id}: {e}")
+        finally:
+            active_processes.pop(camera_id, None)
+            
+    # Remove from latest_frames cache
+    latest_frames.pop(camera_id, None)
+            
+    # 2. Database cleanup
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT zone_id FROM cameras WHERE id = ?", (camera_id,))
+        row = cursor.fetchone()
+        zone_id = row[0] if row else None
+        
+        cursor.execute("DELETE FROM cameras WHERE id = ?", (camera_id,))
+        cursor.execute("DELETE FROM live_metrics WHERE camera_id = ?", (camera_id,))
+        if zone_id:
+            cursor.execute("DELETE FROM alerts WHERE zone_id = ?", (zone_id,))
+            
+        conn.commit()
+    except Exception as db_err:
+        raise HTTPException(status_code=500, detail=f"Database deletion failed: {db_err}")
+    finally:
+        conn.close()
+    
+    # 3. Delete uploaded video file
+    try:
+        for f in os.listdir(UPLOAD_DIR):
+            if f.startswith(f"{camera_id}_"):
+                os.remove(os.path.join(UPLOAD_DIR, f))
+    except Exception as file_err:
+        logger.warning(f"Could not delete video file: {file_err}")
+        
+    return {"status": "success", "camera_id": camera_id}
+
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
@@ -669,10 +783,12 @@ def health() -> dict:
 @app.on_event("startup")
 def startup_event():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, zone_id FROM cameras WHERE active = 1")
-    cameras = cursor.fetchall()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, zone_id FROM cameras WHERE active = 1")
+        cameras = cursor.fetchall()
+    finally:
+        conn.close()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cv_script = os.path.abspath(os.path.join(script_dir, "..", "cv-detection", "detect.py"))
@@ -690,8 +806,9 @@ def startup_event():
             py_bin, cv_script,
             "--video", video_path,
             "--camera-id", cam_id,
+            "--zone-id", zone_id,
             "--output-json", output_json,
-            "--mode", "both",
+            "--mode", "file",
             "--loop"
         ]
         

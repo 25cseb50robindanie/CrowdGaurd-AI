@@ -222,6 +222,8 @@ def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str,
         prediction_message=prediction_message,
         confidence=confidence
     )
+    if not isinstance(pred_res, dict):
+        pred_res = {}
     risk_level = pred_res.get("risk_level", predicted_risk)
     prediction = pred_res.get("prediction", "")
 
@@ -238,6 +240,8 @@ def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str,
         stagnation_index=stagnation_index,
         confidence=confidence
     )
+    if not isinstance(rec_res, dict):
+        rec_res = {}
     recommendation = rec_res.get("recommendation", "")
 
     # 3. Explanation Agent
@@ -256,6 +260,8 @@ def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str,
         stagnation_index=stagnation_index,
         confidence=confidence
     )
+    if not isinstance(exp_res, dict):
+        exp_res = {}
     explanation = exp_res.get("explanation", "")
 
     return {

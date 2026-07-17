@@ -19,6 +19,7 @@ export default function App() {
   const [dispatchLogs, setDispatchLogs] = useState([]); // List of dispatched events
   const [toasts, setToasts] = useState([]); // List of active toasts
   const [showLinkCameraModal, setShowLinkCameraModal] = useState(false); // Upload modal toggle
+  const [acknowledgedZones, setAcknowledgedZones] = useState({});
 
   // Form states for linking camera
   const [uploadCamId, setUploadCamId] = useState('');
@@ -37,25 +38,22 @@ export default function App() {
         return res.json();
       })
       .then((data) => {
-        if (data && data.length > 0) {
-          const formatted = data.map(cam => ({
-            id: cam.id,
-            name: cam.name,
-            label: cam.label,
-            streamUrl: cam.stream_url,
-            streamLabel: cam.stream_label,
-            boundingBoxes: []
-          }));
-          setCameras(formatted);
-          setActiveCamera((prev) => {
-            // Keep current camera selection if it still exists
-            if (prev) {
-              const matched = formatted.find(c => c.id === prev.id);
-              if (matched) return matched;
-            }
-            return formatted[0];
-          });
-        }
+        const formatted = (data || []).map(cam => ({
+          id: cam.id,
+          name: cam.name,
+          label: cam.label,
+          streamUrl: cam.stream_url,
+          streamLabel: cam.stream_label,
+          boundingBoxes: []
+        }));
+        setCameras(formatted);
+        setActiveCamera((prev) => {
+          if (prev) {
+            const matched = formatted.find(c => c.id === prev.id);
+            if (matched) return matched;
+          }
+          return formatted.length > 0 ? formatted[0] : null;
+        });
       })
       .catch((err) => {
         setCameras(mockCameras);
@@ -70,60 +68,120 @@ export default function App() {
       .catch(() => {});
   };
 
+  const handleUnlinkCamera = (cameraId) => {
+    fetch(`http://localhost:8000/api/cameras/${cameraId}`, {
+      method: 'DELETE',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to unlink camera');
+        return res.json();
+      })
+      .then(() => {
+        handleAddToast("Camera unlinked successfully.");
+        setCameras((prev) => {
+          const updated = prev.filter((c) => c.id !== cameraId);
+          if (activeCamera && activeCamera.id === cameraId) {
+            setActiveCamera(updated.length > 0 ? updated[0] : null);
+          }
+          return updated;
+        });
+      })
+      .catch((err) => {
+        handleAddToast(`Error unlinking camera: ${err.message}`);
+      });
+  };
+
   React.useEffect(() => {
     loadInitialData();
   }, []);
 
   // Polling zones & alerts
   React.useEffect(() => {
+    let isMounted = true;
+    let isFetching = false;
+
     const pollBackend = setInterval(() => {
-      // 1. Fetch live zone metrics
-      fetch('http://localhost:8000/api/zones')
-        .then((res) => {
-          if (!res.ok) throw new Error('API server returned error');
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.zones) {
-            setZones(data.zones);
-          }
-        })
-        .catch(() => {
-          setZones(mockZonesData.zones);
-        });
+      if (isFetching) return;
+      isFetching = true;
 
-      // 2. Fetch live alerts (synced with the database lifecycle status)
-      fetch('http://localhost:8000/api/alerts')
-        .then((res) => {
-          if (!res.ok) throw new Error('API server error');
-          return res.json();
-        })
-        .then((data) => {
-          if (data) {
-            setAlerts(data);
-            
-            // Automatically trigger the critical alert modal if Platform 1 (gate4) becomes red
-            // and has status NEW (prevents popup triggers for acknowledged/dispatched items!)
-            const platform1Alert = data.find(a => a.zoneId === 'gate4');
-            if (platform1Alert && platform1Alert.riskLevel === 'red' && platform1Alert.status === 'NEW') {
-              setShowCriticalAlert(true);
+      Promise.all([
+        // 1. Fetch live zone metrics
+        fetch('http://localhost:8000/api/zones')
+          .then((res) => {
+            if (!res.ok) throw new Error('API server returned error');
+            return res.json();
+          })
+          .then((data) => {
+            if (isMounted && data && data.zones) {
+              setZones(data.zones);
             }
-          }
-        })
-        .catch(() => {
-          // fallback silently
-        });
+          })
+          .catch(() => {
+            if (isMounted) {
+              setZones(mockZonesData.zones);
+            }
+          }),
 
-      // 3. Poll dispatch history
-      fetch('http://localhost:8000/api/dispatches')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data) setDispatchLogs(data);
-        })
-        .catch(() => {});
+        // 2. Fetch live alerts (synced with the database lifecycle status)
+        fetch('http://localhost:8000/api/alerts')
+          .then((res) => {
+            if (!res.ok) throw new Error('API server error');
+            return res.json();
+          })
+          .then((data) => {
+            if (isMounted && data) {
+              setAlerts(data);
+              
+              // Automatically trigger the critical alert modal if any alert becomes red and status is NEW
+              // but check if it's not already acknowledged to prevent popup spam.
+              setAcknowledgedZones(prev => {
+                const next = { ...prev };
+                let updated = false;
+
+                // 1. Scan for active red zones to trigger alerts
+                data.forEach(a => {
+                  if (a.riskLevel === 'red' && a.status === 'NEW') {
+                    if (!next[a.zoneId]) {
+                      setShowCriticalAlert(true);
+                    }
+                  }
+                });
+
+                // 2. Clear acknowledgement for zones that are no longer red
+                Object.keys(next).forEach(zId => {
+                  const activeAlert = data.find(a => a.zoneId === zId);
+                  if (!activeAlert || activeAlert.riskLevel !== 'red') {
+                    delete next[zId];
+                    updated = true;
+                  }
+                });
+
+                return updated ? next : prev;
+              });
+            }
+          })
+          .catch(() => {
+            // fallback silently
+          }),
+
+        // 3. Poll dispatch history
+        fetch('http://localhost:8000/api/dispatches')
+          .then((res) => res.json())
+          .then((data) => {
+            if (isMounted && data) {
+              setDispatchLogs(data);
+            }
+          })
+          .catch(() => {})
+      ]).finally(() => {
+        isFetching = false;
+      });
     }, 5000);
 
-    return () => clearInterval(pollBackend);
+    return () => {
+      isMounted = false;
+      clearInterval(pollBackend);
+    };
   }, []);
 
   // Sync the expanded alert detail modal values with polled updates in real time
@@ -151,6 +209,10 @@ export default function App() {
   const handleDispatch = (alert) => {
     const zoneId = alert.zoneId || alert.zone_id || "gate4";
     handleAddToast("Alert sent to Station Control Room");
+
+    // Mark incident as acknowledged for this zone so popup won't show again
+    setAcknowledgedZones(prev => ({ ...prev, [zoneId]: true }));
+    setShowCriticalAlert(false);
 
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -188,9 +250,20 @@ export default function App() {
 
   // Triggered when clicking Analyze inside Critical Alert Modal
   const handleViewCriticalDetails = () => {
-    const gate4Alert = alerts.find((a) => a.zoneId === 'gate4') || alerts[0];
+    // Acknowledge all currently red critical zones so they don't pop up again
+    setAcknowledgedZones(prev => {
+      const next = { ...prev };
+      alerts.forEach(a => {
+        if (a.riskLevel === 'red') {
+          next[a.zoneId] = true;
+        }
+      });
+      return next;
+    });
+
+    const activeRedAlert = alerts.find((a) => a.riskLevel === 'red') || alerts[0];
     setShowCriticalAlert(false);
-    setAnalyzeAlert(gate4Alert);
+    setAnalyzeAlert(activeRedAlert);
   };
 
   // Handle linking camera upload submission
@@ -267,6 +340,7 @@ export default function App() {
                   onAnalyzeAlert={(alert) => setAnalyzeAlert(alert)}
                   onDispatchAlert={handleDispatch}
                   onLinkCameraClick={() => setShowLinkCameraModal(true)}
+                  onUnlinkCamera={handleUnlinkCamera}
                 />
               } 
             />
@@ -290,11 +364,22 @@ export default function App() {
 
         <CriticalAlertModal
           isOpen={showCriticalAlert}
-          onClose={() => setShowCriticalAlert(false)}
-          onDispatch={() => {
-            const gate4Alert = alerts.find((a) => a.zoneId === 'gate4') || alerts[0];
-            handleDispatch(gate4Alert);
+          onClose={() => {
+            // Acknowledge all currently red critical zones so they don't pop up again
+            setAcknowledgedZones(prev => {
+              const next = { ...prev };
+              alerts.forEach(a => {
+                if (a.riskLevel === 'red') {
+                  next[a.zoneId] = true;
+                }
+              });
+              return next;
+            });
             setShowCriticalAlert(false);
+          }}
+          onDispatch={() => {
+            const criticalAlert = alerts.find((a) => a.riskLevel === 'red') || alerts[0];
+            handleDispatch(criticalAlert);
           }}
           onViewDetails={handleViewCriticalDetails}
         />

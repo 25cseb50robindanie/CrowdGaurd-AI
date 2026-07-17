@@ -18,6 +18,7 @@ export default function DashboardPage({
   onAnalyzeAlert,
   onDispatchAlert,
   onLinkCameraClick,
+  onUnlinkCamera,
 }) {
   const navigate = useNavigate();
 
@@ -56,6 +57,7 @@ export default function DashboardPage({
         activeCameraId={activeCamera ? activeCamera.id : null}
         onSelectCamera={setActiveCamera}
         onLinkCameraClick={onLinkCameraClick}
+        onUnlinkCamera={onUnlinkCamera}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">

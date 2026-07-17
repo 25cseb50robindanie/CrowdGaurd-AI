@@ -3,6 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 export default function VideoPlayer({ camera }) {
   const [showAiLayers, setShowAiLayers] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Connecting to live camera...");
+  const [hasError, setHasError] = useState(false);
   const videoRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -28,19 +31,83 @@ export default function VideoPlayer({ camera }) {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    setIsLoading(true);
+    setHasError(false);
+    setLoadingMessage("Connecting to live camera...");
+    
+    const cycleMessages = [
+      "Connecting to live camera...",
+      "Initializing AI detection...",
+      "Configuring YOLO tracker...",
+      "Receiving live video frames..."
+    ];
+    let idx = 0;
+    const msgInterval = setInterval(() => {
+      if (idx < cycleMessages.length - 1) {
+        idx++;
+        setLoadingMessage(cycleMessages[idx]);
+      }
+    }, 2500);
+
+    const timeoutId = setTimeout(() => {
+      setIsLoading((loading) => {
+        if (loading) {
+          setHasError(true);
+        }
+        return loading;
+      });
+    }, 15000); // 15 seconds connection timeout
+
+    return () => {
+      clearInterval(msgInterval);
+      clearTimeout(timeoutId);
+    };
+  }, [camera.streamUrl]);
+
+  const handleMediaLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleMediaError = () => {
+    setIsLoading(false);
+    setHasError(true);
+  };
+
   return (
     <div 
       ref={containerRef}
-      className={`aspect-video bg-surface-container-lowest border-2 border-error relative group rounded overflow-hidden flex items-center justify-center ${
+      className={`aspect-video bg-surface-container-lowest border-2 border-error relative group rounded overflow-hidden flex items-center justify-center transition-all duration-300 ${
         isFullscreen ? 'w-screen h-screen' : ''
       }`}
     >
+      {/* Loading Overlay */}
+      {isLoading && !hasError && (
+        <div className="absolute inset-0 z-30 bg-surface-container-lowest/90 flex flex-col items-center justify-center gap-3 transition-all duration-300">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs text-on-surface-variant font-medium animate-pulse">{loadingMessage}</span>
+        </div>
+      )}
+
+      {/* Error State */}
+      {hasError && (
+        <div className="absolute inset-0 z-30 bg-surface-container-lowest flex flex-col items-center justify-center gap-3 p-6 text-center transition-all duration-300">
+          <span className="material-symbols-outlined text-error text-3xl">videocam_off</span>
+          <span className="text-xs font-semibold text-on-surface">Camera Connection Failed</span>
+          <span className="text-[11px] text-on-surface-variant max-w-xs leading-relaxed">
+            Unable to receive live stream. The AI detection worker might still be starting or the video source is unreachable.
+          </span>
+        </div>
+      )}
+
       {/* video element / live MJPEG stream */}
       {camera.streamUrl && camera.streamUrl.includes('/stream') ? (
         <img
           key={camera.streamUrl}
           src={camera.streamUrl}
-          className="w-full h-full object-cover opacity-80 absolute inset-0"
+          onLoad={handleMediaLoad}
+          onError={handleMediaError}
+          className="w-full h-full object-cover opacity-80 absolute inset-0 transition-opacity duration-300"
           alt="Live Video Stream"
         />
       ) : (
@@ -48,11 +115,13 @@ export default function VideoPlayer({ camera }) {
           ref={videoRef}
           key={camera.streamUrl} // forces re-render/reload when switching camera
           src={camera.streamUrl}
+          onCanPlay={handleMediaLoad}
+          onError={handleMediaError}
           autoPlay
           muted
           loop
           playsInline
-          className="w-full h-full object-cover opacity-60 absolute inset-0"
+          className="w-full h-full object-cover opacity-60 absolute inset-0 transition-opacity duration-300"
         />
       )}
 

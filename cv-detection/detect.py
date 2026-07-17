@@ -314,6 +314,25 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
     # SQLite DB path resolution
     db_path = os.path.abspath(os.path.join(script_dir, "..", "backend", "crowdguard.db"))
 
+    # Load camera capacity from SQLite DB dynamically
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT zone_id, max_capacity FROM cameras WHERE id = ?", (camera_id,))
+        row = cursor.fetchone()
+        if row:
+            db_zone_id, db_capacity = row[0], int(row[1])
+            MAX_CAPACITIES[db_zone_id] = db_capacity
+            print(f"[CV-Detection] Loaded max_capacity={db_capacity} for zone '{db_zone_id}' from DB for camera '{camera_id}'")
+        else:
+            print(f"[CV-Detection] WARNING: Camera '{camera_id}' not found in SQLite database. Using default fallback capacity.")
+    except Exception as e:
+        print(f"[CV-Detection] WARNING: Could not query SQLite database for capacity: {e}. Using default fallback capacity.")
+    finally:
+        if conn:
+            conn.close()
+
     print("[CV-Detection] Entering processing loop. Press Ctrl+C to terminate.")
 
     last_boxes = []
@@ -600,6 +619,7 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 if output_mode in ["file", "both"]:
                     write_json_atomic(payload, output_json_path)
 
+                conn = None
                 try:
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
@@ -637,9 +657,11 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                             tracking_stability
                         ))
                     conn.commit()
-                    conn.close()
                 except Exception as db_err:
                     print(f"[CV-Detection] DB UPDATE ERROR: {db_err}")
+                finally:
+                    if conn:
+                        conn.close()
 
                 if test_mode:
                     print(f"\n[TEST MODE] Live JSON Payload: {json.dumps(payload, indent=2)}")
