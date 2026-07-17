@@ -16,7 +16,7 @@ const INITIAL_ZONES_DATA = [
 ];
 
 export default function App() {
-  const [locations] = useState(mockLocations);
+  const [locations, setLocations] = useState(mockLocations);
   const [zonesData, setZonesData] = useState(INITIAL_ZONES_DATA);
   const [pollingError, setPollingError] = useState(false);
 
@@ -42,6 +42,44 @@ export default function App() {
       if (data && data.zones) {
         setZonesData(data.zones);
         setPollingError(false);
+
+        // Dynamically update the Central Railway Station zones list and hotspots mapping
+        setLocations(prevLocations => {
+          return prevLocations.map(loc => {
+            if (loc.id === "central-station") {
+              const activeZoneIds = data.zones.map(z => z.zone_id);
+              
+              // Map hotspots dynamically
+              const hotspots = data.zones.map((z, idx) => {
+                let label = `Platform ${z.zone_id.replace("plt", "").toUpperCase()}`;
+                if (z.zone_id === "gate4") label = "Platform 1";
+                if (z.zone_id === "courtyard") label = "Platform 2";
+                if (z.zone_id === "mainpath") label = "Platform 3";
+
+                // Distribute pins dynamically across the map
+                const topVal = `${25 + idx * 20}%`;
+                const leftVal = `${33 + (idx % 2) * 20}%`;
+
+                return {
+                  zoneId: z.zone_id,
+                  label: label,
+                  top: topVal,
+                  left: leftVal
+                };
+              });
+
+              return {
+                ...loc,
+                zones: activeZoneIds,
+                mapConfig: {
+                  ...loc.mapConfig,
+                  hotspots: hotspots
+                }
+              };
+            }
+            return loc;
+          });
+        });
       }
     } catch (error) {
       console.warn("Polling http://localhost:8000/api/zones failed. Falling back to simulated client-side state. Error:", error.message);

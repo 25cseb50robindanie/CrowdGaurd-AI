@@ -53,6 +53,15 @@ export default function LocationDetail({ locations, zonesData }) {
     meadoweast: "Main Arena Stand"
   };
 
+  const getZoneLabel = (zoneId) => {
+    if (zoneLabels[zoneId]) return zoneLabels[zoneId];
+    if (zoneId.startsWith("plt")) {
+      const num = zoneId.replace("plt", "");
+      return `Platform ${num.toUpperCase()}`;
+    }
+    return `Platform ${zoneId.toUpperCase()}`;
+  };
+
   return (
     <div className="location-detail-page animate-fade-in">
       <TopBar onMenuOpen={() => setIsMenuOpen(true)} />
@@ -115,7 +124,7 @@ export default function LocationDetail({ locations, zonesData }) {
                 >
                   <ZoneStatusCard 
                     zone={zone}
-                    label={zoneLabels[zone.zone_id]}
+                    label={getZoneLabel(zone.zone_id)}
                     isHighlighted={activeHotspot === zone.zone_id}
                   />
                 </div>

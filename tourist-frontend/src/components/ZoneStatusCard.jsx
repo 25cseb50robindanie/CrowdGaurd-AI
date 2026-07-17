@@ -2,18 +2,30 @@ import React from 'react';
 import './ZoneStatusCard.css';
 
 export default function ZoneStatusCard({ zone, label, isHighlighted }) {
-  const { zone_id, status, density, message } = zone;
+  const { zone_id, status, density } = zone;
 
-  // Stitch dynamic safety status translations and styles
+  // Map public status messages to shield internal details from passengers
   const getBadgeDetails = (statusVal) => {
     switch (statusVal) {
       case 'red':
-        return { label: 'Avoid', class: 'badge-avoid', pulseClass: 'pulse-avoid' };
+        return { label: 'High Risk', class: 'badge-avoid', pulseClass: 'pulse-avoid' };
       case 'amber':
-        return { label: 'Getting Busy', class: 'badge-busy', pulseClass: 'pulse-busy' };
+        return { label: 'Increasing Crowd', class: 'badge-busy', pulseClass: 'pulse-busy' };
       case 'green':
       default:
         return { label: 'Safe', class: 'badge-safe', pulseClass: 'pulse-safe' };
+    }
+  };
+
+  const getPublicAdvisory = (statusVal) => {
+    switch (statusVal) {
+      case 'red':
+        return 'Avoid - Platform has reached high crowd density. Please follow station staff guidance.';
+      case 'amber':
+        return 'Caution - Crowd density is rising. Expect longer wait times.';
+      case 'green':
+      default:
+        return 'Safe - Platform counts are stable and within safe limits.';
     }
   };
 
@@ -21,7 +33,10 @@ export default function ZoneStatusCard({ zone, label, isHighlighted }) {
 
   // Map zone IDs to their specific mock public images from Stitch
   const getZoneThumbnail = (id) => {
-    switch (id) {
+    // Canonicalize custom platform IDs to match designed layout templates
+    const canonicalId = id.replace("plt1", "gate4").replace("plt2", "courtyard").replace("plt3", "mainpath");
+    
+    switch (canonicalId) {
       case 'gate4': // Platform 1
         return 'https://lh3.googleusercontent.com/aida-public/AB6AXuCIHSbCvUy7lGwnOvFBZOmUYV_-cnv04zKNxbRnOcAdts26XdFwaFK-NJbZjowJ7GYWmSIsPh1OGqbaTuMMOgv4cH1V63LSt3F4iMPHIczqgAZvZs5fPZDg8_39-n1OrjLjrqhqrHad0sek0SrMqXH1YeqA_WY_qqE5b2x2L4J0ITBAxP2ghbVh_btm9uwPT1wDc7XQOG_s_koHfwh5m0C8KAcc-csZxtM70nnY-3q7vmKSGJglwQnvvDRLAcrgXIu7ADXvXBGLqlA';
       case 'courtyard': // Platform 2
@@ -73,7 +88,7 @@ export default function ZoneStatusCard({ zone, label, isHighlighted }) {
 
       {/* Warning Advisory description */}
       <p className="zone-desc-message">
-        {message}
+        {getPublicAdvisory(status)}
       </p>
       
       {/* Density value and meter bar */}

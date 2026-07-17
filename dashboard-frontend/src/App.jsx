@@ -77,7 +77,7 @@ export default function App() {
         return res.json();
       })
       .then(() => {
-        handleAddToast("Camera unlinked successfully.");
+        handleAddToast("Camera disconnected.");
         setCameras((prev) => {
           const updated = prev.filter((c) => c.id !== cameraId);
           if (activeCamera && activeCamera.id === cameraId) {
@@ -132,25 +132,32 @@ export default function App() {
             if (isMounted && data) {
               setAlerts(data);
               
-              // Automatically trigger the critical alert modal if any alert becomes red and status is NEW
-              // but check if it's not already acknowledged to prevent popup spam.
+              // Automatically trigger the critical alert modal if live person count exceeds 150
+              // and status is NEW (but check if it's not already acknowledged to prevent popup spam).
               setAcknowledgedZones(prev => {
                 const next = { ...prev };
                 let updated = false;
 
-                // 1. Scan for active red zones to trigger alerts
+                // 1. Scan for active zones exceeding the 150 person threshold to trigger alerts
                 data.forEach(a => {
-                  if (a.riskLevel === 'red' && a.status === 'NEW') {
+                  const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
+                  if (countVal > 150 && a.status === 'NEW') {
                     if (!next[a.zoneId]) {
                       setShowCriticalAlert(true);
                     }
                   }
                 });
 
-                // 2. Clear acknowledgement for zones that are no longer red
+                // 2. Clear acknowledgement for zones that returned to 150 or below
                 Object.keys(next).forEach(zId => {
                   const activeAlert = data.find(a => a.zoneId === zId);
-                  if (!activeAlert || activeAlert.riskLevel !== 'red') {
+                  if (activeAlert) {
+                    const countVal = activeAlert.aiMetadata && activeAlert.aiMetadata.count ? parseInt(activeAlert.aiMetadata.count, 10) : 0;
+                    if (countVal <= 150) {
+                      delete next[zId];
+                      updated = true;
+                    }
+                  } else {
                     delete next[zId];
                     updated = true;
                   }
@@ -208,7 +215,7 @@ export default function App() {
   // Dispatch Force action handler
   const handleDispatch = (alert) => {
     const zoneId = alert.zoneId || alert.zone_id || "gate4";
-    handleAddToast("Alert sent to Station Control Room");
+    handleAddToast("Force dispatched successfully.");
 
     // Mark incident as acknowledged for this zone so popup won't show again
     setAcknowledgedZones(prev => ({ ...prev, [zoneId]: true }));
@@ -250,20 +257,25 @@ export default function App() {
 
   // Triggered when clicking Analyze inside Critical Alert Modal
   const handleViewCriticalDetails = () => {
-    // Acknowledge all currently red critical zones so they don't pop up again
+    // Acknowledge all currently threshold-exceeded zones so they don't pop up again
     setAcknowledgedZones(prev => {
       const next = { ...prev };
       alerts.forEach(a => {
-        if (a.riskLevel === 'red') {
+        const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
+        if (countVal > 150) {
           next[a.zoneId] = true;
         }
       });
       return next;
     });
 
-    const activeRedAlert = alerts.find((a) => a.riskLevel === 'red') || alerts[0];
+    const activeThresholdAlert = alerts.find((a) => {
+      const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
+      return countVal > 150;
+    }) || alerts[0];
     setShowCriticalAlert(false);
-    setAnalyzeAlert(activeRedAlert);
+    setAnalyzeAlert(activeThresholdAlert);
+    handleAddToast("Critical alert acknowledged.");
   };
 
   // Handle linking camera upload submission
@@ -296,7 +308,8 @@ export default function App() {
     .then((data) => {
       setIsUploading(false);
       setShowLinkCameraModal(false);
-      handleAddToast("Camera linked. Background CV pipeline is running.");
+      handleAddToast("Video uploaded successfully.");
+      handleAddToast("Camera linked successfully.");
       
       // Clean form fields
       setUploadCamId('');
@@ -365,20 +378,25 @@ export default function App() {
         <CriticalAlertModal
           isOpen={showCriticalAlert}
           onClose={() => {
-            // Acknowledge all currently red critical zones so they don't pop up again
+            // Acknowledge all currently threshold-exceeded zones so they don't pop up again
             setAcknowledgedZones(prev => {
               const next = { ...prev };
               alerts.forEach(a => {
-                if (a.riskLevel === 'red') {
+                const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
+                if (countVal > 150) {
                   next[a.zoneId] = true;
                 }
               });
               return next;
             });
             setShowCriticalAlert(false);
+            handleAddToast("Critical alert acknowledged.");
           }}
           onDispatch={() => {
-            const criticalAlert = alerts.find((a) => a.riskLevel === 'red') || alerts[0];
+            const criticalAlert = alerts.find((a) => {
+              const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
+              return countVal > 150;
+            }) || alerts[0];
             handleDispatch(criticalAlert);
           }}
           onViewDetails={handleViewCriticalDetails}

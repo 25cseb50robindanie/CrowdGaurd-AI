@@ -54,7 +54,7 @@ export default function ReportsPage({ onAddToast }) {
     }
     
     // Trigger toast feedback
-    onAddToast("Review submitted to Command Staff.");
+    onAddToast("Review submitted.");
 
     // Post review data to FastAPI backend (Person C)
     fetch('http://localhost:8000/api/reviews', {
