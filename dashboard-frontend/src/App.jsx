@@ -132,28 +132,28 @@ export default function App() {
             if (isMounted && data) {
               setAlerts(data);
               
-              // Automatically trigger the critical alert modal if live person count exceeds 150
+              // Automatically trigger the critical alert modal if live person count exceeds 100
               // and status is NEW (but check if it's not already acknowledged to prevent popup spam).
               setAcknowledgedZones(prev => {
                 const next = { ...prev };
                 let updated = false;
 
-                // 1. Scan for active zones exceeding the 150 person threshold to trigger alerts
+                // 1. Scan for active zones exceeding the 100 person threshold to trigger alerts
                 data.forEach(a => {
                   const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
-                  if (countVal > 150 && a.status === 'NEW') {
+                  if (countVal > 100 && a.status === 'NEW') {
                     if (!next[a.zoneId]) {
                       setShowCriticalAlert(true);
                     }
                   }
                 });
 
-                // 2. Clear acknowledgement for zones that returned to 150 or below
+                // 2. Clear acknowledgement for zones that returned to 100 or below
                 Object.keys(next).forEach(zId => {
                   const activeAlert = data.find(a => a.zoneId === zId);
                   if (activeAlert) {
                     const countVal = activeAlert.aiMetadata && activeAlert.aiMetadata.count ? parseInt(activeAlert.aiMetadata.count, 10) : 0;
-                    if (countVal <= 150) {
+                    if (countVal <= 100) {
                       delete next[zId];
                       updated = true;
                     }
@@ -262,7 +262,7 @@ export default function App() {
       const next = { ...prev };
       alerts.forEach(a => {
         const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
-        if (countVal > 150) {
+        if (countVal > 100) {
           next[a.zoneId] = true;
         }
       });
@@ -271,7 +271,7 @@ export default function App() {
 
     const activeThresholdAlert = alerts.find((a) => {
       const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
-      return countVal > 150;
+      return countVal > 100;
     }) || alerts[0];
     setShowCriticalAlert(false);
     setAnalyzeAlert(activeThresholdAlert);
@@ -383,7 +383,7 @@ export default function App() {
               const next = { ...prev };
               alerts.forEach(a => {
                 const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
-                if (countVal > 150) {
+                if (countVal > 100) {
                   next[a.zoneId] = true;
                 }
               });
@@ -395,7 +395,7 @@ export default function App() {
           onDispatch={() => {
             const criticalAlert = alerts.find((a) => {
               const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
-              return countVal > 150;
+              return countVal > 100;
             }) || alerts[0];
             handleDispatch(criticalAlert);
           }}
