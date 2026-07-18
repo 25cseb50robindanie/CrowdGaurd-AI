@@ -8,6 +8,8 @@ import CriticalAlertModal from './components/CriticalAlertModal';
 import Toast from './components/Toast';
 import { mockZonesData, mockCameras, mockAlerts } from './mockData';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 export default function App() {
   // Global React States
   const [zones, setZones] = useState([]);
@@ -32,7 +34,7 @@ export default function App() {
 
   // Fetch cameras, dispatches, and initial alerts on mount
   const loadInitialData = () => {
-    fetch('http://localhost:8000/api/cameras')
+    fetch(`${API_BASE_URL}/api/cameras`)
       .then((res) => {
         if (!res.ok) throw new Error('API server offline');
         return res.json();
@@ -60,7 +62,7 @@ export default function App() {
         setActiveCamera(mockCameras[0]);
       });
 
-    fetch('http://localhost:8000/api/dispatches')
+    fetch(`${API_BASE_URL}/api/dispatches`)
       .then((res) => res.json())
       .then((data) => {
         if (data) setDispatchLogs(data);
@@ -69,7 +71,7 @@ export default function App() {
   };
 
   const handleUnlinkCamera = (cameraId) => {
-    fetch(`http://localhost:8000/api/cameras/${cameraId}`, {
+    fetch(`${API_BASE_URL}/api/cameras/${cameraId}`, {
       method: 'DELETE',
     })
       .then((res) => {
@@ -106,7 +108,7 @@ export default function App() {
 
       Promise.all([
         // 1. Fetch live zone metrics
-        fetch('http://localhost:8000/api/zones')
+        fetch(`${API_BASE_URL}/api/zones`)
           .then((res) => {
             if (!res.ok) throw new Error('API server returned error');
             return res.json();
@@ -123,7 +125,7 @@ export default function App() {
           }),
 
         // 2. Fetch live alerts (synced with the database lifecycle status)
-        fetch('http://localhost:8000/api/alerts')
+        fetch(`${API_BASE_URL}/api/alerts`)
           .then((res) => {
             if (!res.ok) throw new Error('API server error');
             return res.json();
@@ -172,7 +174,7 @@ export default function App() {
           }),
 
         // 3. Poll dispatch history
-        fetch('http://localhost:8000/api/dispatches')
+        fetch(`${API_BASE_URL}/api/dispatches`)
           .then((res) => res.json())
           .then((data) => {
             if (isMounted && data) {
@@ -232,7 +234,7 @@ export default function App() {
     const recommendation = alert.aiMetadata?.recommendation || "No recommendation";
 
     // Post dispatch event to FastAPI backend (Updates SQLite status to DISPATCHED)
-    fetch('http://localhost:8000/api/dispatch', {
+    fetch(`${API_BASE_URL}/api/dispatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -309,7 +311,7 @@ export default function App() {
     formData.append("max_capacity", uploadCapacity);
     formData.append("video", selectedFile);
 
-    fetch('http://localhost:8000/api/cameras/upload', {
+    fetch(`${API_BASE_URL}/api/cameras/upload`, {
       method: 'POST',
       body: formData
     })

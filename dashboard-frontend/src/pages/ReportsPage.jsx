@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { mockHistoricalAlerts } from '../mockData';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 export default function ReportsPage({ onAddToast }) {
   const [accurateSelected, setAccurateSelected] = useState(null); // 'yes' or 'no'
   const [feedbackNotes, setFeedbackNotes] = useState('');
@@ -57,7 +59,7 @@ export default function ReportsPage({ onAddToast }) {
     onAddToast("Review submitted.");
 
     // Post review data to FastAPI backend (Person C)
-    fetch('http://localhost:8000/api/reviews', {
+    fetch(`${API_BASE_URL}/api/reviews`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

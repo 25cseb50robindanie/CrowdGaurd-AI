@@ -24,6 +24,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from database import get_db_connection, init_db
 
+# Centralized API URLs for Production
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000").rstrip("/")
+AGENT_API_URL = os.getenv("AGENT_API_URL", "http://127.0.0.1:8001").rstrip("/")
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("backend")
@@ -330,7 +334,7 @@ def get_live_zones_data() -> List[Zone]:
             zone_id = cam["zone_id"]
             zone_name = cam["label"]
             max_capacity = cam["max_capacity"]
-            stream_url = f"http://localhost:8000/api/cameras/{cam_id}/stream"
+            stream_url = f"{BACKEND_API_URL}/api/cameras/{cam_id}/stream"
             
             # Query latest live metrics for this camera
             cursor.execute("""
@@ -378,7 +382,7 @@ def get_live_zones_data() -> List[Zone]:
             status_lifecycle = alert_row["status"] if alert_row else "NEW"
             
             # Contact AI Agent Server
-            agent_url = "http://127.0.0.1:8001/analyze/zone"
+            agent_url = f"{AGENT_API_URL}/analyze/zone"
             agent_payload = {
                 "zone_id": zone_id,
                 "person_count": metric["person_count"],
@@ -526,7 +530,7 @@ def get_cameras():
         cam_dict = dict(r)
         import urllib.parse
         safe_id = urllib.parse.quote(cam_dict['id'])
-        cam_dict["stream_url"] = f"http://localhost:8000/api/cameras/{safe_id}/stream"
+        cam_dict["stream_url"] = f"{BACKEND_API_URL}/api/cameras/{safe_id}/stream"
         cameras_list.append(CameraResponse(**cam_dict))
     return cameras_list
 
@@ -567,7 +571,7 @@ def get_alerts():
             "timestamp": alert_dict["timestamp"],
             "dateTime": alert_dict["date_time"],
             "message": alert_dict["message"],
-            "streamUrl": f"http://localhost:8000/api/cameras/{safe_cam_id}/stream",
+            "streamUrl": f"{BACKEND_API_URL}/api/cameras/{safe_cam_id}/stream",
             "status": alert_dict["status"],
             "boundingBoxes": [],
             "density": alert_dict.get("density", 0.0),
@@ -629,7 +633,7 @@ def create_dispatch(payload: DispatchInput) -> Dispatch:
             "final_outcome": "Resolved/Dispatched"
         }
         # Post request to Agents microservice
-        requests.post("http://127.0.0.1:8001/memory/save", json=save_payload, timeout=2.0)
+        requests.post(f"{AGENT_API_URL}/memory/save", json=save_payload, timeout=2.0)
     except Exception as memory_err:
         logger.error(f"Failed to forward incident memory to agents service: {memory_err}")
 
@@ -665,7 +669,7 @@ class MemorySearchInputBackend(BaseModel):
 def search_memory_backend(payload: MemorySearchInputBackend):
     try:
         response = requests.post(
-            "http://127.0.0.1:8001/memory/search",
+            f"{AGENT_API_URL}/memory/search",
             json={
                 "zone_id": payload.zone_id,
                 "zone_name": payload.zone_name,
@@ -727,7 +731,7 @@ async def upload_camera(
 
     import urllib.parse
     safe_id = urllib.parse.quote(camera_id)
-    stream_url = f"http://localhost:8000/api/cameras/{safe_id}/stream"
+    stream_url = f"{BACKEND_API_URL}/api/cameras/{safe_id}/stream"
 
     conn = get_db_connection()
     try:

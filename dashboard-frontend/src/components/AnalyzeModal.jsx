@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 export default function AnalyzeModal({ alert, onClose, onDispatch }) {
   const [officerNotes, setOfficerNotes] = useState('');
   const [notesFocused, setNotesFocused] = useState(false);
@@ -24,7 +26,7 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
       const densityScore = alert.density || 0.0;
       const recommendedAction = alert.aiMetadata?.recommendation || "Continue normal monitoring";
 
-      fetch('http://localhost:8000/api/memory/search', {
+      fetch(`${API_BASE_URL}/api/memory/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

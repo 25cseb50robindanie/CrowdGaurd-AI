@@ -4,6 +4,8 @@ import Home from './pages/Home';
 import LocationDetail from './pages/LocationDetail';
 import { mockLocations } from './data/locationsData';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 // Safe baseline fallback mock data if API polling encounters network issues
 const INITIAL_ZONES_DATA = [
   { zone_id: "gate4", status: "red", density: 4.2, message: "Avoid — expected unsafe in 8 min" },
@@ -33,7 +35,7 @@ export default function App() {
 
   const fetchZones = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/zones');
+      const response = await fetch(`${API_BASE_URL}/api/zones`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
