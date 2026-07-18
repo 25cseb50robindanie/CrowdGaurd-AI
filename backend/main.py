@@ -59,6 +59,42 @@ metrics_history = {}
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+def resolve_py_bin():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    for path in [
+        ["venv", "Scripts", "python.exe"],  # Windows
+        ["venv", "bin", "python"],          # Linux
+        [".venv", "bin", "python"]         # Linux alternative
+    ]:
+        candidate = os.path.abspath(os.path.join(script_dir, "..", *path))
+        if os.path.exists(candidate):
+            return candidate
+    return "python"
+
+def get_local_backend_url():
+    port_env = os.getenv("PORT", "8000")
+    return f"http://127.0.0.1:{port_env}"
+
+import threading
+
+def monitor_subprocess(camera_id: str, proc: subprocess.Popen, log_path: str):
+    proc.wait()
+    exit_code = proc.returncode
+    if exit_code != 0 and exit_code != -15 and exit_code != 15:  # Ignore SIGTERM (15/-15)
+        try:
+            if os.path.exists(log_path):
+                # Read last 50 lines to keep backend logs readable
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
+                    last_lines = "".join(lines[-50:])
+                logger.error(f"YOLO worker for camera {camera_id} crashed (exit code {exit_code}). Last logs:\n{last_lines}")
+            else:
+                logger.error(f"YOLO worker for camera {camera_id} exited unexpectedly with code {exit_code}.")
+        except Exception as log_err:
+            logger.error(f"Failed to read YOLO log file for camera {camera_id}: {log_err}")
+    else:
+        logger.info(f"YOLO worker for camera {camera_id} exited cleanly with code {exit_code}.")
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -768,8 +804,8 @@ async def upload_camera(
     # Launch dynamic YOLO worker process
     cv_script = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cv-detection", "detect.py"))
     output_json = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cv-detection", f"cv_output_{zone_id}.json"))
-    python_exec = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "venv", "Scripts", "python.exe"))
-    py_bin = python_exec if os.path.exists(python_exec) else "python"
+    py_bin = resolve_py_bin()
+    local_backend_url = get_local_backend_url()
     
     cmd = [
         py_bin, cv_script,
@@ -778,13 +814,29 @@ async def upload_camera(
         "--zone-id", zone_id,
         "--output-json", output_json,
         "--mode", "file",
-        "--loop"
+        "--loop",
+        "--backend-url", local_backend_url
     ]
     
     logger.info(f"Launching YOLO worker subprocess: {' '.join(cmd)}")
+    log_path = os.path.join(UPLOAD_DIR, f"yolo_worker_{camera_id}.log")
     try:
-        proc = subprocess.Popen(cmd, cwd=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cv-detection")))
+        log_file = open(log_path, "w", encoding="utf-8", errors="ignore")
+        proc = subprocess.Popen(
+            cmd, 
+            cwd=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cv-detection")),
+            stdout=log_file,
+            stderr=subprocess.STDOUT
+        )
         active_processes[camera_id] = proc
+        
+        # Monitor the process for errors/unexpected exit
+        monitor_thread = threading.Thread(
+            target=monitor_subprocess, 
+            args=(camera_id, proc, log_path), 
+            daemon=True
+        )
+        monitor_thread.start()
     except Exception as proc_err:
         logger.error(f"Failed to spawn worker subprocess: {proc_err}")
     
@@ -857,8 +909,8 @@ def startup_event():
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cv_script = os.path.abspath(os.path.join(script_dir, "..", "cv-detection", "detect.py"))
-    python_exec = os.path.abspath(os.path.join(script_dir, "..", "venv", "Scripts", "python.exe"))
-    py_bin = python_exec if os.path.exists(python_exec) else "python"
+    py_bin = resolve_py_bin()
+    local_backend_url = get_local_backend_url()
     
     video_path = os.path.abspath(os.path.join(script_dir, "..", "CGAssests", "1.mp4"))
     
@@ -874,13 +926,28 @@ def startup_event():
             "--zone-id", zone_id,
             "--output-json", output_json,
             "--mode", "file",
-            "--loop"
+            "--loop",
+            "--backend-url", local_backend_url
         ]
         
         logger.info(f"Starting startup YOLO worker subprocess for {cam_id}: {' '.join(cmd)}")
+        log_path = os.path.join(UPLOAD_DIR, f"yolo_worker_{cam_id}.log")
         try:
-            proc = subprocess.Popen(cmd, cwd=os.path.abspath(os.path.join(script_dir, "..", "cv-detection")))
+            log_file = open(log_path, "w", encoding="utf-8", errors="ignore")
+            proc = subprocess.Popen(
+                cmd, 
+                cwd=os.path.abspath(os.path.join(script_dir, "..", "cv-detection")),
+                stdout=log_file,
+                stderr=subprocess.STDOUT
+            )
             active_processes[cam_id] = proc
+            
+            monitor_thread = threading.Thread(
+                target=monitor_subprocess, 
+                args=(cam_id, proc, log_path), 
+                daemon=True
+            )
+            monitor_thread.start()
         except Exception as e:
             logger.error(f"Failed to start startup YOLO worker for {cam_id}: {e}")
 

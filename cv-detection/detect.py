@@ -164,7 +164,8 @@ def write_json_atomic(data, target_path):
 def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_interval, 
                  write_interval, density_multiplier, output_mode, host, port, test_mode,
                  output_video_path=None, max_frames=None, target_zone_id=None,
-                 model_name="yolov8n.pt", conf=0.12, inference_w=1920, inference_h=1080):
+                 model_name="yolov8n.pt", conf=0.12, inference_w=1920, inference_h=1080,
+                 backend_url="http://127.0.0.1:8000"):
     global latest_payload
     import sqlite3
     import math
@@ -256,7 +257,7 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
     import urllib.parse
     http_session = requests.Session()
     safe_camera_id = urllib.parse.quote(camera_id)
-    frame_post_url = f"http://127.0.0.1:8000/api/cameras/{safe_camera_id}/frame"
+    frame_post_url = f"{backend_url.rstrip('/')}/api/cameras/{safe_camera_id}/frame"
 
     # Initialize VideoWriter if output_video_path is provided
     writer = None
@@ -718,6 +719,7 @@ if __name__ == "__main__":
                         help="Output mode: 'file' updates JSON file, 'api' hosts a local endpoint, 'both' does both")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="API server host")
     parser.add_argument("--port", type=int, default=8000, help="API server port")
+    parser.add_argument("--backend-url", type=str, default="http://127.0.0.1:8000", help="FastAPI backend base URL for frame streaming")
     
     # Test modes
     parser.add_argument("--test-mode", action="store_true", help="Run in test/debug mode, printing JSON output to console")
@@ -772,6 +774,7 @@ if __name__ == "__main__":
         model_name=args.model_name,
         conf=args.conf,
         inference_w=args.inference_w,
-        inference_h=args.inference_h
+        inference_h=args.inference_h,
+        backend_url=args.backend_url
     )
 
