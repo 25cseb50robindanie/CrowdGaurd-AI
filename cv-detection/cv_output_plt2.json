@@ -1,0 +1,17 @@
+{
+  "camera_id": "cam1",
+  "timestamp": "2026-07-17T20:11:11",
+  "zones": [
+    {
+      "zone_id": "plt2",
+      "person_count": 24,
+      "density": 3.0,
+      "trend": "stable",
+      "rolling_average": 24.0,
+      "growth_rate": 0.0,
+      "sustained_congestion_sec": 0.0,
+      "speed": 0.0,
+      "stagnation_index": 1.0
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "camera_id": "cam1",
+  "timestamp": "2026-07-17T22:24:09",
+  "zones": [
+    {
+      "zone_id": "mk1",
+      "person_count": 79,
+      "density": 9.88,
+      "trend": "falling",
+      "rolling_average": 88.5,
+      "growth_rate": -12.5,
+      "sustained_congestion_sec": 20.0,
+      "speed": 4185.59,
+      "stagnation_index": 0.0
+    }
+  ]
+}
