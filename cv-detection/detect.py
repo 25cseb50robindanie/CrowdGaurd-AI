@@ -549,7 +549,7 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 _, jpeg_buf = cv2.imencode('.jpg', frame)
                 http_session.post(frame_post_url, data=jpeg_buf.tobytes(), timeout=0.5)
             except Exception as post_err:
-                pass
+                print(f"[CV-Detection] Error posting frame: {post_err}", flush=True)
 
             # 5. Save histories & compute trends
             for zone_id, count in current_counts.items():

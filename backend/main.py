@@ -842,6 +842,19 @@ async def upload_camera(
     
     return {"status": "success", "camera_id": camera_id, "stream_url": stream_url}
 
+@app.get("/api/cameras/{camera_id}/logs")
+def get_camera_logs(camera_id: str):
+    """Returns the last 500 lines of YOLO worker logs for troubleshooting."""
+    log_path = os.path.join(UPLOAD_DIR, f"yolo_worker_{camera_id}.log")
+    if not os.path.exists(log_path):
+        raise HTTPException(status_code=404, detail="Log file not found.")
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        return {"camera_id": camera_id, "logs": lines[-500:]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read logs: {e}")
+
 @app.delete("/api/cameras/{camera_id}")
 async def unlink_camera(camera_id: str):
     logger.info(f"Unlinking camera: {camera_id}")
