@@ -11,7 +11,7 @@ logger = logging.getLogger("agent_chain")
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
-if api_key and not api_key.startswith("your_") and not api_key.startswith("AQ."):
+if api_key and not api_key.startswith("your_"):
     genai.configure(api_key=api_key)
     logger.info("Google Generative AI configured with API key.")
 else:
