@@ -1,17 +1,17 @@
 {
   "camera_id": "cam1",
-  "timestamp": "2026-07-17T22:35:06",
+  "timestamp": "2026-07-18T18:20:00",
   "zones": [
     {
       "zone_id": "plt1",
-      "person_count": 121,
-      "density": 15.12,
-      "trend": "rising",
-      "rolling_average": 112.45,
-      "growth_rate": 10.79,
-      "sustained_congestion_sec": 38.0,
-      "speed": 3315.93,
-      "stagnation_index": 0.0
+      "person_count": 26,
+      "density": 3.25,
+      "trend": "stable",
+      "rolling_average": 26.0,
+      "growth_rate": 0.0,
+      "sustained_congestion_sec": 0.0,
+      "speed": 0.0,
+      "stagnation_index": 1.0
     }
   ]
 }

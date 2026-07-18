@@ -213,7 +213,7 @@ export default function App() {
   };
 
   // Dispatch Force action handler
-  const handleDispatch = (alert) => {
+  const handleDispatch = (alert, notes = "") => {
     const zoneId = alert.zoneId || alert.zone_id || "gate4";
     handleAddToast("Force dispatched successfully.");
 
@@ -225,6 +225,12 @@ export default function App() {
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const logEntryMessage = `Operational Unit dispatched in response to: ${alert.title || "Critical density"}`;
 
+    // Extract stats for Mem0 memory saving
+    const crowdCount = alert.aiMetadata?.count ? parseInt(alert.aiMetadata.count, 10) : (alert.count || 0);
+    const densityVal = alert.density || 0.0;
+    const riskLevel = alert.riskLevel || "green";
+    const recommendation = alert.aiMetadata?.recommendation || "No recommendation";
+
     // Post dispatch event to FastAPI backend (Updates SQLite status to DISPATCHED)
     fetch('http://localhost:8000/api/dispatch', {
       method: 'POST',
@@ -232,7 +238,12 @@ export default function App() {
       body: JSON.stringify({
         zone_id: zoneId,
         timestamp: timeStr,
-        message: logEntryMessage
+        message: logEntryMessage,
+        operator_notes: notes,
+        crowd_count: crowdCount,
+        density: densityVal,
+        risk_level: riskLevel,
+        recommendation: recommendation
       })
     })
     .then((res) => res.json())
@@ -254,6 +265,7 @@ export default function App() {
       ]);
     });
   };
+
 
   // Triggered when clicking Analyze inside Critical Alert Modal
   const handleViewCriticalDetails = () => {

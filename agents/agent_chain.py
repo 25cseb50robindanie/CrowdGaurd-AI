@@ -272,7 +272,53 @@ def run_agent_chain(zone_id: str, person_count: int, density: float, trend: str,
         "explanation": explanation
     }
 
+def summarize_memories(memories: list) -> str:
+    """
+    Summarizes a list of retrieved similar incident memories using Gemini.
+    """
+    if not api_key:
+        logger.warning("GEMINI_API_KEY is not configured. Skipping summarization.")
+        return ""
+    
+    if not memories:
+        return ""
+
+    memories_str = ""
+    for i, mem in enumerate(memories):
+        memories_str += (
+            f"Incident {i+1}:\n"
+            f"- Date: {mem.get('date')}\n"
+            f"- Risk Level: {mem.get('risk_level')}\n"
+            f"- Action Taken: {mem.get('action_taken')}\n"
+            f"- Operator Notes: {mem.get('operator_notes')}\n"
+            f"- Outcome: {mem.get('outcome')}\n\n"
+        )
+
+    system_instruction = (
+        "You are assisting a command center operator.\n\n"
+        "Based on these previous incidents, summarize the most relevant operational insight in 2-3 sentences.\n\n"
+        "Mention:\n"
+        "- common response\n"
+        "- whether it worked\n"
+        "- anything the operator should know\n\n"
+        "Do not invent information that is not present."
+    )
+
+    prompt = f"Previous Similar Incidents:\n\n{memories_str}"
+
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-2.0-flash",
+            system_instruction=system_instruction
+        )
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        logger.error(f"Gemini memory summarization failed: {e}")
+        return ""
+
 if __name__ == "__main__":
     print("Testing Agent Chain locally...")
     result = run_agent_chain("gate4", 30, 4.2, "rising", 25.5, 1.2, 5.0, 15.2, 1.0, "high", 10.0, "Likely unsafe in 10s", 0.85)
     print(json.dumps(result, indent=2))
+

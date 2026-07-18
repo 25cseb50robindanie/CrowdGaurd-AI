@@ -4,7 +4,51 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
   const [officerNotes, setOfficerNotes] = useState('');
   const [notesFocused, setNotesFocused] = useState(false);
   const [aiLayersActive, setAiLayersActive] = useState(true);
+  const [memories, setMemories] = useState([]);
+  const [aiSummary, setAiSummary] = useState('');
+  const [memoriesLoading, setMemoriesLoading] = useState(false);
+  const [memoriesFailed, setMemoriesFailed] = useState(false);
   const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (alert) {
+      setMemoriesLoading(true);
+      setMemoriesFailed(false);
+      setMemories([]);
+      setAiSummary('');
+
+      const zoneId = alert.zoneId || alert.zone_id || "gate4";
+      const zoneName = alert.zoneName || "Gate 4";
+      const riskLevel = alert.riskLevel || "green";
+      const crowdCount = alert.aiMetadata?.count ? parseInt(alert.aiMetadata.count, 10) : (alert.count || 0);
+      const densityScore = alert.density || 0.0;
+      const recommendedAction = alert.aiMetadata?.recommendation || "Continue normal monitoring";
+
+      fetch('http://localhost:8000/api/memory/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zone_id: zoneId,
+          zone_name: zoneName,
+          risk_level: riskLevel,
+          crowd_count: crowdCount,
+          density_score: densityScore,
+          recommended_action: recommendedAction
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        setMemories(data.memories || []);
+        setAiSummary(data.summary || '');
+        setMemoriesLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch similar incidents:", err);
+        setMemoriesFailed(true);
+        setMemoriesLoading(false);
+      });
+    }
+  }, [alert]);
 
   useEffect(() => {
     // Sync playback time from the dashboard's main video player to keep it looking like a continuous live stream
@@ -278,6 +322,65 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
               </div>
             </section>
 
+            {/* AI Memory Insight Section */}
+            {!memoriesFailed && (
+              <section className="p-6 border-b border-outline-variant bg-primary/5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">AI Memory Insight</span>
+                  <span className="material-symbols-outlined text-primary">history_edu</span>
+                </div>
+                
+                {memoriesLoading ? (
+                  <div className="text-center font-body-md text-xs text-on-surface-variant/60 py-2 animate-pulse">
+                    Retrieving AI Memory insights...
+                  </div>
+                ) : memories && memories.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* AI Summary */}
+                    <div className="p-3 bg-surface-container-low border border-outline-variant rounded">
+                      <p className="font-label-caps text-[9px] text-primary uppercase mb-1">AI Summary</p>
+                      <p className="font-body-md text-xs text-on-surface leading-relaxed">
+                        {aiSummary || "Summary unavailable. Showing raw historical facts."}
+                      </p>
+                    </div>
+
+                    {/* Most Recent Incident Details */}
+                    {(() => {
+                      const firstMem = memories[0];
+                      return (
+                        <div className="p-3 bg-surface-container-low border border-outline-variant rounded space-y-2">
+                          <div className="flex justify-between items-center border-b border-outline-variant/30 pb-1.5 mb-1.5">
+                            <span className="font-label-caps text-[9px] text-on-surface-variant uppercase">Most Relevant Previous Incident</span>
+                            <span className="font-data-table text-[9px] text-outline font-semibold">{firstMem.date}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <p className="font-label-caps text-[8px] text-on-surface-variant uppercase">Previous Action Taken</p>
+                              <p className="font-body-md text-on-surface font-medium truncate" title={firstMem.action_taken}>{firstMem.action_taken}</p>
+                            </div>
+                            <div>
+                              <p className="font-label-caps text-[8px] text-on-surface-variant uppercase">Previous Outcome</p>
+                              <p className="font-body-md text-on-surface font-medium truncate" title={firstMem.outcome}>{firstMem.outcome}</p>
+                            </div>
+                          </div>
+                          {firstMem.operator_notes && (
+                            <div className="pt-1.5 border-t border-outline-variant/30">
+                              <p className="font-label-caps text-[8px] text-on-surface-variant uppercase mb-0.5">Operator Notes</p>
+                              <p className="font-body-md text-on-surface-variant italic">"{firstMem.operator_notes}"</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <p className="font-body-md text-xs text-on-surface-variant/60 italic text-center py-2">
+                    No similar incident memory available.
+                  </p>
+                )}
+              </section>
+            )}
+
             {/* Local Heat Map Section */}
             <section className="p-6 border-b border-outline-variant">
               <div className="flex items-center justify-between mb-4">
@@ -363,7 +466,7 @@ export default function AnalyzeModal({ alert, onClose, onDispatch }) {
               Dismiss Alert
             </button>
             <button 
-              onClick={() => { onDispatch(alert); }}
+              onClick={() => { onDispatch(alert, officerNotes); }}
               className="bg-primary text-on-primary px-5 py-1.5 rounded font-label-caps text-[10px] uppercase font-bold shadow-lg shadow-primary-container/20 hover:opacity-90 active:scale-95 transition-all"
             >
               Dispatch Response Unit

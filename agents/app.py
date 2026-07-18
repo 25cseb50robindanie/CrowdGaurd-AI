@@ -4,7 +4,8 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from agent_chain import run_agent_chain
+from agent_chain import run_agent_chain, summarize_memories
+from memory import save_incident, search_similar_incidents
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -151,6 +152,70 @@ async def analyze_single_zone(zone: ZoneInput):
         logger.error(f"Error analyzing zone {zone.zone_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to analyze zone {zone.zone_id}: {str(e)}")
 
+# Memory Schemas and Endpoints
+class MemorySaveInput(BaseModel):
+    incident_id: str
+    zone_id: str
+    zone_name: str
+    timestamp: str
+    crowd_count: int
+    density_score: float
+    risk_level: str
+    ai_recommendation: str
+    actual_dispatched_response: str
+    operator_notes: str
+    final_outcome: Optional[str] = "Dispatched"
+
+class MemorySearchInput(BaseModel):
+    zone_id: str
+    zone_name: str
+    risk_level: str
+    crowd_count: int
+    density_score: float
+    recommended_action: str
+
+@app.post("/memory/save")
+def save_memory_endpoint(data: MemorySaveInput):
+    logger.info(f"Saving incident memory for incident {data.incident_id} in zone {data.zone_id}")
+    success = save_incident(
+        incident_id=data.incident_id,
+        zone_id=data.zone_id,
+        zone_name=data.zone_name,
+        timestamp=data.timestamp,
+        crowd_count=data.crowd_count,
+        density_score=data.density_score,
+        risk_level=data.risk_level,
+        ai_recommendation=data.ai_recommendation,
+        actual_dispatched_response=data.actual_dispatched_response,
+        operator_notes=data.operator_notes,
+        final_outcome=data.final_outcome
+    )
+    return {"success": success}
+
+@app.post("/memory/search")
+def search_memory_endpoint(data: MemorySearchInput):
+    logger.info(f"Searching incident memory for zone {data.zone_id} with risk {data.risk_level}")
+    memories = search_similar_incidents(
+        zone_id=data.zone_id,
+        zone_name=data.zone_name,
+        risk_level=data.risk_level,
+        crowd_count=data.crowd_count,
+        density_score=data.density_score,
+        recommended_action=data.recommended_action
+    )
+    summary = ""
+    if memories:
+        try:
+            summary = summarize_memories(memories)
+        except Exception as e:
+            logger.error(f"Gemini summarizer failed, falling back to raw memories: {e}")
+            summary = ""
+    return {
+        "memories": memories,
+        "summary": summary
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
+

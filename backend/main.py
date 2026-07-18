@@ -96,6 +96,12 @@ class DispatchInput(BaseModel):
     zone_id: str
     timestamp: str
     message: str
+    operator_notes: Optional[str] = None
+    crowd_count: Optional[int] = None
+    density: Optional[float] = None
+    risk_level: Optional[str] = None
+    recommendation: Optional[str] = None
+    incident_id: Optional[str] = None
 
 class Dispatch(BaseModel):
     id: int
@@ -605,6 +611,28 @@ def create_dispatch(payload: DispatchInput) -> Dispatch:
         conn.commit()
     finally:
         conn.close()
+
+    try:
+        import uuid
+        incident_uuid = payload.incident_id or str(uuid.uuid4())
+        save_payload = {
+            "incident_id": incident_uuid,
+            "zone_id": payload.zone_id,
+            "zone_name": zone_name,
+            "timestamp": payload.timestamp,
+            "crowd_count": payload.crowd_count or 0,
+            "density_score": payload.density or 0.0,
+            "risk_level": payload.risk_level or "unknown",
+            "ai_recommendation": payload.recommendation or "No recommendation",
+            "actual_dispatched_response": payload.message,
+            "operator_notes": payload.operator_notes or "",
+            "final_outcome": "Resolved/Dispatched"
+        }
+        # Post request to Agents microservice
+        requests.post("http://127.0.0.1:8001/memory/save", json=save_payload, timeout=2.0)
+    except Exception as memory_err:
+        logger.error(f"Failed to forward incident memory to agents service: {memory_err}")
+
     
     return Dispatch(
         id=dispatch_id,
@@ -625,7 +653,40 @@ def get_dispatches():
         conn.close()
     return [Dispatch(**dict(r)) for r in rows]
 
+class MemorySearchInputBackend(BaseModel):
+    zone_id: str
+    zone_name: str
+    risk_level: str
+    crowd_count: int
+    density_score: float
+    recommended_action: str
+
+@app.post("/api/memory/search")
+def search_memory_backend(payload: MemorySearchInputBackend):
+    try:
+        response = requests.post(
+            "http://127.0.0.1:8001/memory/search",
+            json={
+                "zone_id": payload.zone_id,
+                "zone_name": payload.zone_name,
+                "risk_level": payload.risk_level,
+                "crowd_count": payload.crowd_count,
+                "density_score": payload.density_score,
+                "recommended_action": payload.recommended_action
+            },
+            timeout=3.0
+        )
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.warning(f"Agents memory search returned status {response.status_code}")
+            return {"memories": [], "summary": ""}
+    except Exception as e:
+        logger.error(f"Failed to connect to agents memory search service: {e}")
+        return {"memories": [], "summary": ""}
+
 @app.post("/api/reviews", response_model=Review, status_code=201)
+
 def create_review(payload: ReviewInput) -> Review:
     conn = get_db_connection()
     try:
