@@ -1,3 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.0+cpu
+torchvision==0.17.0+cpu
 fastapi>=0.115.0
 pydantic>=2.0.0
 requests>=2.31.0
