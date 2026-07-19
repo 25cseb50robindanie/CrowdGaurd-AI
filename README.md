@@ -80,6 +80,8 @@ The same prediction engine powers **two interfaces**: a detailed Authority Dashb
  
 ## Computer Vision Pipeline
  
+![Computer Vision Detection Architecture](./docs/cv-detection-diagram.png?v=1)
+ 
 Built on **YOLOv8s** + OpenCV, chosen for the balance between inference speed and detection accuracy in dense crowds.
  
 | Stage | What Happens |
@@ -94,6 +96,8 @@ Built on **YOLOv8s** + OpenCV, chosen for the balance between inference speed an
 ---
  
 ## AI Agent System
+ 
+![AI Agent System Architecture](./docs/agents-diagram.png?v=1)
  
 A **three-agent chain** built with Google Gemini, orchestrated to turn raw metrics into human-readable, actionable guidance:
  
@@ -118,6 +122,8 @@ This is what allows CrowdGuard AI to move beyond one-off predictions toward a sy
 ---
  
 ## Backend Architecture
+ 
+![FastAPI Backend Architecture](./docs/backend-diagram.png?v=1)
  
 Built with **FastAPI** (async, non-blocking), backed by SQLite for the MVP.
  
