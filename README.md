@@ -1,167 +1,324 @@
-# CrowdGuard AI: Real-Time Crowd Safety & Analytics Platform
-
-CrowdGuard AI is an advanced, real-time safety monitoring and risk-prediction system designed for high-density transit environments such as railway stations and transit hubs. By integrating computer vision (YOLOv8) with a multi-agent LLM analysis engine (powered by Google Gemini), CrowdGuard AI monitors transit zones, predicts potential congestion risks, and recommends operational interventions to station managers and passengers.
-
+# CrowdGuard AI — Predictive Crowd Safety Platform
+ 
+**Built for [Build in AI for India](https://buildinaiforindia.com) — a 7-day nationwide AI hackathon**
+ 
+CrowdGuard AI is a multi-agent, computer-vision-powered platform that predicts dangerous crowd density **before** it becomes critical — giving authorities minutes of early warning instead of reacting after a crowd crush has already begun.
+ 
 ---
-
-## 🏗️ System Architecture
-
-CrowdGuard AI is split into five primary modules that communicate via lightweight HTTP REST APIs and stream interfaces:
-
-```
-                  ┌──────────────────────────────────────────────┐
-                  │           Authority Dashboard (React)        │
-                  └──────┬────────────────────────────────┬──────┘
-                         │                                │
-                         ▼ (HTTP API Calls)               ▼ (MJPEG Stream)
-  ┌──────────────────────────────────────────────────────────────┐
-  │                   Core Backend API (FastAPI)                 │
-  │                      [Port: 8000]                            │
-  └──────┬───────────────────┬───────────────────┬───────────────┘
-         │                   │                   │
-         ▼ (Subprocess /     ▼ (HTTP Post)       ▼ (HTTP POST /
-            Local Filesystem)   [Port: 8001]        DB Connection)
-  ┌──────────────┐   ┌───────────────────┐   ┌───────────────────┐
-  │ YOLO Worker  │   │ AI Agent Server   │   │ SQLite/PostgreSQL │
-  │ (detect.py)  │   │ (Gemini Chain)    │   │ Database          │
-  └──────────────┘   └─────────┬─────────┘   └───────────────────┘
-                               │
-                               ▼ (Google API)
-                     ┌───────────────────┐
-                     │ Google Gemini LLM │
-                     └───────────────────┘
-```
-
-1. **Authority Dashboard (`dashboard-frontend`)**: A React (Vite) application used by transit operators to view live safety feeds, congestion metrics, register cameras, and dispatch response forces.
-2. **Tourist Dashboard (`tourist-frontend`)**: A React (Vite) application used by passengers to view live platform safety statuses, rolling passenger counts, and transit safety advisories.
-3. **Core Backend (`backend`)**: A FastAPI service that orchestrates camera feeds, processes uploaded videos, calculates deterministic prediction metrics, tracks dispatch events, and manages the database.
-4. **AI Agent Server (`agents`)**: A FastAPI microservice coordinating a chain of three LLM agents (Prediction, Recommendation, and Explanation) using the Google Gemini SDK.
-5. **Computer Vision Node (`cv-detection`)**: A YOLOv8-based computer vision script launched dynamically as a subprocess for each active camera. It processes frames, tracks passenger count, calculates density/speed, and pushes MJPEG bytes to the Core Backend.
-
+ 
+## ⚠️ Known Issue — Please Read Before Testing the Live Demo
+ 
+Our deployed version runs on **Render's free tier**, which provides CPU-only compute. Locally, our YOLOv8 detection pipeline runs on GPU and performs in real time. On Render's free CPU instance, detection is significantly slower:
+ 
+- When a video is added, it can take **up to ~5 minutes** before the interface reflects it.
+- Detection continues processing in the background even when the page looks idle — it is working, just slow, not broken.
+- Returning to the site after a few minutes will show the detection results catching up.
+**This is a hosting/hardware limitation of the free tier, not a flaw in the detection logic itself.** The underlying pipeline is fully functional, as demonstrated in our local run and demo video. With GPU-backed hosting (or a paid Render tier), this runs in real time as intended.
+ 
+For the most accurate impression of actual performance, please refer to our **demo video**, which was recorded using local GPU inference.
+ 
 ---
-
-## 📁 Repository Structure
-
-```
-CrowdGaurdAI/
-├── agents/                  # FastAPI Multi-Agent Service (Gemini API)
-│   ├── app.py               # Microservice Entry Point (Port 8001)
-│   ├── agent_chain.py       # Chain logic for Prediction, Recommendation & Explanation
-│   ├── requirements.txt     # Python dependencies for the Agent Server
-│   └── .env.example         # Example configuration file for Gemini API Key
-├── backend/                 # Core Backend REST API
-│   ├── main.py              # Main REST API and Subprocess Orchestration (Port 8000)
-│   ├── database.py          # SQLite connection and schema definition
-│   ├── crowdguard.db        # SQLite Local Database File (created automatically)
-│   └── uploads/             # Directory where uploaded camera streams (videos) are stored
-├── cv-detection/            # Computer Vision Node
-│   ├── detect.py            # YOLOv8 passenger tracking & speed measurement worker
-│   ├── requirements.txt     # CV specific dependencies (OpenCV, Ultralytics, etc.)
-│   └── yolov8n.pt           # Pre-trained YOLOv8 Nano model weights
-├── dashboard-frontend/      # Authority Web Interface (Vite / React)
-│   ├── src/                 # Application codebase (App.jsx, pages, components)
-│   ├── package.json         # React NPM configurations
-│   └── vite.config.js       # Vite build configurations (Port 5173)
-├── tourist-frontend/        # Tourist Passenger Web Interface (Vite / React)
-│   ├── src/                 # Passenger dashboard components and routing
-│   ├── package.json         # NPM configurations
-│   └── vite.config.js       # Vite build configurations (Port 5174)
-└── CGAssests/               # Contains sample video feeds for camera registration
-```
-
+ 
+## The Problem
+ 
+India's mega-gatherings — temple festivals, railway platforms, religious pilgrimages, concerts, political rallies — pack millions of people into small spaces every year. Crowd disasters rarely happen simply because there are "too many people" in one place; they happen because of **rapid, localized changes in crowd movement**: sudden surges at gates, panic, barricades, train arrivals, or bottlenecks that develop faster than a human operator can notice.
+ 
+Existing crowd safety infrastructure — CCTV monitored by human operators — is **purely reactive**. By the time overcrowding is visually obvious to a person watching a screen, the situation is often already dangerous, and evacuation becomes difficult. Stampedes and crowd crushes in India have repeatedly caused deaths and injuries, and current systems offer no predictive intelligence — they observe, they do not anticipate.
+ 
+## Our Solution
+ 
+CrowdGuard AI turns raw video into an early-warning system using a real multi-agent AI pipeline:
+ 
+1. **Detect** — YOLOv8 computer vision tracks people and crowd density in real time across defined zones.
+2. **Predict** — AI agents (Google Gemini) analyze density trends and forecast unsafe congestion **5–15 minutes ahead**.
+3. **Recommend** — The system suggests a concrete action (e.g. "Open Gate 6, redirect incoming queue").
+4. **Alert** — Authorities receive a plain-language explanation of the risk, never a black-box alarm.
+The same prediction engine powers **two interfaces**: a detailed Authority Dashboard for police and disaster management, and a simplified Tourist Portal so the public can check crowd safety before they travel.
+ 
 ---
-
-## 🚀 Local Installation & Setup
-
+ 
+## System Architecture
+ 
+![CrowdGuard AI System Architecture](./docs/architecture-diagram.png)
+ 
+*(Diagram: Tourist Portal and Authority Dashboard both communicate with the FastAPI Backend over REST/MJPEG. The Backend spawns the YOLOv8 CV subprocess, persists state to SQLite, and forwards structured metrics to the AI Agent Service, which queries Mem0 for historical context and calls the Gemini LLM chain.)*
+ 
+### High-Level Data Flow
+ 
+```
+[Video File / Stream]
+       │
+       ▼
+[YOLOv8 Subprocess (detect.py)] ──(Annotated Frames)──▶ [MJPEG Streaming Endpoint]
+       │ (JSON Metrics Payload)
+       ▼
+[FastAPI Backend (/api/cv/metrics)]
+       │
+       ▼
+[Deterministic Prediction Engine]  (risk score, velocity, time-to-surge)
+       │
+       ▼
+[SQLite DB Persistence]  (live_metrics & alerts tables)
+       │
+       ▼
+[AI Agent Service (/analyze/camera)]
+       │
+       ▼
+[Mem0 Context Retrieval]  (searches past similar incidents)
+       │
+       ▼
+[Gemini LLM Multi-Agent Chain]  (prediction & recommendation)
+       │
+       ▼
+[Dashboard / Tourist Portal]  (updates via polling / MJPEG stream)
+```
+ 
+---
+ 
+## Computer Vision Pipeline
+ 
+Built on **YOLOv8s** + OpenCV, chosen for the balance between inference speed and detection accuracy in dense crowds.
+ 
+| Stage | What Happens |
+|---|---|
+| Frame Ingestion | Captures frames via `cv2.VideoCapture` from an uploaded video or camera feed |
+| YOLOv8 Detection | Runs inference at confidence threshold `0.25`, targeting class `0` (person), to capture partially occluded individuals in tight crowds |
+| Density Calculation | `density = person_count / zone_area (m²)` |
+| Optical Flow & Speed | Farneback Dense Optical Flow measures pixel displacement between frames to estimate crowd movement speed and a stagnation index |
+| Frame Encoding | Annotates the frame with bounding boxes and metrics, encodes as JPEG for MJPEG streaming |
+| Metrics Dispatch | Posts structured JSON metrics via `HTTP POST /api/cv/metrics` to the backend |
+ 
+---
+ 
+## AI Agent System
+ 
+A **three-agent chain** built with Google Gemini, orchestrated to turn raw metrics into human-readable, actionable guidance:
+ 
+1. **Prediction Agent** — converts quantitative metrics (count, density, speed, growth rate) into a concise risk summary.
+2. **Recommendation Agent** — combines the prediction with historical incident memory (via Mem0) to generate clear operator actions, e.g. *"Open Gate B, deploy 2 units to Sector 4."*
+3. **Executive / Summary Agent** — synthesizes everything into a structured JSON response: `risk_level`, `prediction`, `explanation`, `recommendation`.
+**Fallback mechanism:** if the Gemini API is unavailable or rate-limited, a rule-based deterministic engine generates structured risk output locally, so the system keeps working even without a live LLM connection.
+ 
+---
+ 
+## 🧠 Partner Spotlight: Mem0
+ 
+CrowdGuard AI uses **[Mem0](https://mem0.ai)** as its long-term memory layer — one of the confirmed partners of Build in AI for India.
+ 
+Standard LLM calls are stateless: each prediction is made in isolation, with no memory of what happened before. Mem0 solves this by giving our agent pipeline **persistent, contextual memory** across incidents:
+ 
+- When a high-density alert is triggered, `agents/memory.py` queries Mem0 for similar past incidents at that zone.
+- Mem0 returns relevant historical context — for example, *"Gate 3 experienced a 3.5 people/m² bottleneck during a previous Friday peak, resolved by opening the bypass corridor."*
+- The Recommendation Agent incorporates this history directly into its live advice, so recommendations improve with experience rather than treating every alert as a first-time event.
+This is what allows CrowdGuard AI to move beyond one-off predictions toward a system that **learns from its own operational history**.
+ 
+---
+ 
+## Backend Architecture
+ 
+Built with **FastAPI** (async, non-blocking), backed by SQLite for the MVP.
+ 
+**Responsibilities:**
+- Camera registry and video upload handling (`/cameras`, `/upload`)
+- Spawning and managing the YOLOv8 detection subprocess per camera
+- Persisting live metrics, alerts, dispatches, and operator reviews to SQLite
+- Running the deterministic prediction engine (risk scores, time-to-surge estimates)
+- Streaming annotated video to the dashboard via MJPEG (`/stream/{camera_id}`)
+- Proxying structured zone metrics to the AI Agent Service (`/analyze/camera`)
+### Key Endpoints
+ 
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/cameras` | GET | List all registered cameras and their status |
+| `/cameras/register` | POST | Register a new camera stream or local video file |
+| `/upload` | POST | Upload a video file (MP4/AVI/MOV) |
+| `/api/cv/metrics` | POST | Ingestion endpoint for detection metrics from `detect.py` |
+| `/stream/{camera_id}` | GET | MJPEG live video stream |
+| `/zones/live` | GET | Aggregated live zone metrics + prediction + AI insights |
+| `/dispatches` | POST | Log a field operator dispatch |
+ 
+### Database Schema (SQLite)
+ 
+- **cameras** — id, name, label, stream_url, max_capacity, zone_id, active
+- **live_metrics** — camera_id, zone_id, timestamp, person_count, density, trend, rolling_average, growth_rate, speed, stagnation_index
+- **alerts** — id, zone_id, zone_name, risk_level, timestamp, message, prediction, explanation, recommendation, confidence
+- **dispatches** — id, timestamp, zone, message, zone_id
+- **reviews** — id, is_accurate, notes, timestamp
+---
+ 
+## Frontend Applications
+ 
+### Authority Dashboard (`dashboard-frontend/`)
+Command-center interface for security officers and venue managers.
+- **Overview** — global metrics, system status, active alert banner
+- **Live Monitoring** — multi-camera grid with live MJPEG streams and risk gauges
+- **Alerts** — filterable alert log with AI explanations and response actions
+- **Dispatch Center** — unit dispatch form with historical dispatch logs
+- **Analytics** — historical density trends and incident review logs
+- **Camera Management** — register streams or upload recorded video
+### Tourist Portal (`tourist-frontend/`)
+Mobile-first public safety interface.
+- **Live Heatmap / Zone Map** — color-coded risk levels (Green = Safe, Amber = Moderate, Red = Congested)
+- **Safe Route Finder** — recommends less congested gates/pathways
+- **Emergency Broadcasts** — public safety notifications from operator dispatches
+---
+ 
+## Tech Stack
+ 
+| Layer | Technology |
+|---|---|
+| Computer Vision | YOLOv8 (Ultralytics), OpenCV, PyTorch |
+| Backend | FastAPI, Uvicorn, Pydantic, SQLite |
+| AI & Reasoning | Google Gemini (1.5 / 2.0 Flash) |
+| Long-Term Memory | Mem0 |
+| Frontend | React 18, Vite, Tailwind CSS |
+| Languages | Python 3.10+, JavaScript (ES6+) |
+| Deployment | Render |
+ 
+---
+ 
+## Project Structure
+ 
+```
+CrowdGuardAI/
+├─ agents/                  # AI agent microservice (port 8001)
+│   ├─ app.py               # FastAPI entry point
+│   ├─ agent_chain.py       # Gemini multi-agent chain
+│   ├─ memory.py            # Mem0 integration
+│   └─ requirements.txt
+├─ backend/                 # Core API server (port 8000)
+│   ├─ main.py
+│   ├─ database.py
+│   └─ requirements.txt
+├─ cv-detection/            # YOLOv8 computer vision engine
+│   ├─ detect.py
+│   ├─ requirements.txt
+│   └─ yolov8n.pt / yolov8s.pt
+├─ dashboard-frontend/      # Authority Dashboard (React + Vite)
+├─ tourist-frontend/        # Tourist Portal (React + Vite)
+├─ docs/                    # Architecture diagrams, documentation assets
+└─ README.md
+```
+ 
+---
+ 
+## Setup & Installation
+ 
 ### Prerequisites
-* **Node.js** (v18 or higher)
-* **Python** (v3.10 or higher)
-* A **Google Gemini API Key** (for agent explanations)
-
-### 1. Set Up Python Virtual Environment
-From the root directory:
+- Python 3.10+
+- Node.js and npm
+- Git
+### 1. Clone the Repository
+ 
 ```bash
-# Create a virtual environment named "venv"
+git clone <YOUR-REPO-URL>
+cd CrowdGuardAI
+```
+ 
+### 2. Set Up the Computer Vision Engine
+ 
+```bash
+cd cv-detection
 python -m venv venv
-
-# Activate the virtual environment
-# On Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# On macOS/Linux:
-source venv/bin/activate
-```
-
-### 2. Configure Environment Variables
-Inside the `agents/` folder, create a `.env` file containing your Gemini API key:
-```env
-GEMINI_API_KEY="your-actual-api-key-here"
-```
-> ⚠️ **Important:** Never commit the `.env` file containing your secret API key. It is included in the project `.gitignore`.
-
-### 3. Run the AI Agent Server
-Navigate to the `agents/` directory, install packages, and start the server:
-```bash
-cd agents
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Mac/Linux
 pip install -r requirements.txt
-python app.py
 ```
-*The Agent Server will run at `http://localhost:8001`.*
-
-### 4. Run the Core Backend API
-Navigate to the `backend/` directory, install the dependencies, and start the FastAPI uvicorn server:
+ 
+### 3. Set Up the Backend
+ 
 ```bash
 cd ../backend
-# Use the same virtual environment
+python -m venv venv
+venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-*The Core Backend will run at `http://localhost:8000`.*
-
-### 5. Start the Authority Dashboard
-In a new terminal window, navigate to the `dashboard-frontend/` directory, install dependencies, and launch Vite:
+ 
+### 4. Set Up the AI Agents Service
+ 
 ```bash
-cd dashboard-frontend
-npm install
-npm run dev
+cd ../agents
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 ```
-*Access the Authority Dashboard at `http://localhost:5173`.*
-
-### 6. Start the Tourist Dashboard
-In another terminal window, navigate to the `tourist-frontend/` directory, install dependencies, and launch Vite:
+ 
+Create a `.env` file inside `agents/` with your API keys:
+ 
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+MEM0_API_KEY=your_mem0_api_key_here
+```
+ 
+> Both keys are optional — the system falls back to deterministic, rule-based logic if either is missing or unavailable, so it still runs without them.
+ 
+### 5. Set Up Both Frontends
+ 
 ```bash
-cd tourist-frontend
+cd ../dashboard-frontend
 npm install
-npm run dev
+ 
+cd ../tourist-frontend
+npm install
 ```
-*Access the Tourist Dashboard at `http://localhost:5174`.*
-
+ 
+### 6. Run Everything Locally
+ 
+Open four separate terminals:
+ 
+```bash
+# Terminal 1 — Backend
+cd backend && python main.py
+ 
+# Terminal 2 — AI Agents
+cd agents && python app.py
+ 
+# Terminal 3 — Authority Dashboard
+cd dashboard-frontend && npm run dev
+ 
+# Terminal 4 — Tourist Portal
+cd tourist-frontend && npm run dev
+```
+ 
+By default:
+- Backend runs on `http://localhost:8000`
+- AI Agent Service runs on `http://127.0.0.1:8001`
+- Dashboard runs on `http://localhost:5173`
+- Tourist Portal runs on `http://localhost:5174`
+### Environment Variables Reference
+ 
+| Variable | Required? | Behavior if Missing |
+|---|---|---|
+| `GEMINI_API_KEY` | Optional | Falls back to rule-based deterministic prediction |
+| `MEM0_API_KEY` | Optional | Memory search degrades gracefully; system still functions |
+| `BACKEND_API_URL` | Optional | Defaults to `http://localhost:8000` |
+| `AGENT_API_URL` | Optional | Defaults to `http://127.0.0.1:8001` |
+ 
 ---
-
-## 🐳 Deployment Guide (Production Readiness)
-
-To deploy CrowdGuard AI to cloud hosting services (e.g., Render, Heroku, AWS, or GCP), make the following adjustments to transition from local development:
-
-### 1. Database Migration (PostgreSQL)
-SQLite works locally but is ephemeral on containerized hosts. Modify `backend/database.py` to support PostgreSQL:
-* Install `psycopg2-binary` or `asyncpg`.
-* Use the environment variable `DATABASE_URL` for the database connection string.
-
-### 2. Move YOLO to a Dedicated Worker
-Spawning YOLO subprocesses inside a web dyno/service is unstable and lacks GPU performance.
-* Run `cv-detection/detect.py` inside a dedicated GPU instance (e.g., AWS EC2 G-type or a Dockerized background worker).
-* Replace the local video upload mechanism with external cloud storage (e.g., AWS S3).
-* Configure the YOLO worker to read from S3 and send metadata / frame streams to the Backend API via HTTP calls.
-
-### 3. Replace Hardcoded `localhost` in Frontends
-Both frontend applications call API endpoints at `http://localhost:8000` by default.
-* Replace the hardcoded base URLs in `dashboard-frontend/src/App.jsx` and `tourist-frontend/src/App.jsx` with Vite environment variables:
-  ```javascript
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-  ```
-* Set `VITE_API_BASE_URL` to your production backend URL during your frontend build process.
-
+ 
+## Performance Notes
+ 
+- **Local (GPU):** ~15–30ms per frame, ~30 FPS
+- **Local (CPU):** ~70–120ms per frame, ~8–12 FPS
+- **Render free tier (CPU-only):** Significantly slower — see the Known Issue notice at the top of this document
+**Optimizations already implemented:** downscaled processing frames (640×360), frame-skipping for optical flow, and asynchronous subprocess decoupling to prevent blocking the main API thread.
+ 
 ---
-
-## 🔒 Security & Best Practices
-* **API Key Safety:** Always verify that `.env` is listed in your `.gitignore` to prevent leaking API keys to public repositories.
-* **CORS Policy:** Restrict CORS allowed origins in `backend/main.py` and `agents/app.py` to your custom domains in production.
+ 
+## Team
+ 
+Built by **Team Catalyst** for Build in AI for India (7-day national AI hackathon).
+ 
+## Future Roadmap
+ 
+- Multi-camera re-identification (ReID) to track individuals across zones
+- WebSockets/SSE to replace HTTP polling for true real-time updates
+- Native RTSP hardware decoding (NVIDIA DeepStream / TensorRT) for production deployments
+- Automated SMS/WhatsApp public alerts via Twilio
+- GPU-backed hosting to eliminate the current free-tier performance limitation
+---
+ 
+## License
+ 
+Built for the Build in AI for India hackathon. See repository for license details.
+ 
