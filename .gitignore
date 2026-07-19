@@ -7,8 +7,7 @@ __pycache__/
 .env
 .env.*
 
-# Ignore raw media assets in root
-CGAssests/
+# Raw media assets in root tracked for testing
 
 # CV Processed Video Loops
 dashboard-frontend/public/assets/cameras/*_processed.mp4

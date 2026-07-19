@@ -288,6 +288,9 @@ By default:
 - AI Agent Service runs on `http://127.0.0.1:8001`
 - Dashboard runs on `http://localhost:5173`
 - Tourist Portal runs on `http://localhost:5174`
+
+> 💡 **Sample Video Feeds for Testing**: Pre-loaded sample crowd video files (`1.mp4` and `4.mp4`) are included in the `CGAssests/` directory. You can upload these videos directly through the Authority Dashboard camera management UI to test real-time computer vision detection, crowd density tracking, and AI risk alert generation.
+
 ### Environment Variables Reference
  
 | Variable | Required? | Behavior if Missing |
