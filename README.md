@@ -42,7 +42,7 @@ The same prediction engine powers **two interfaces**: a detailed Authority Dashb
  
 ## System Architecture
  
-![CrowdGuard AI System Architecture](./docs/architecture-diagram.png)
+![CrowdGuard AI System Architecture](./docs/architecture-diagram.png?v=2)
  
 *(Diagram: Tourist Portal and Authority Dashboard both communicate with the FastAPI Backend over REST/MJPEG. The Backend spawns the YOLOv8 CV subprocess, persists state to SQLite, and forwards structured metrics to the AI Agent Service, which queries Mem0 for historical context and calls the Gemini LLM chain.)*
  
