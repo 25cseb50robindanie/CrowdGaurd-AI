@@ -1,6 +1,9 @@
 # CrowdGuard AI — Predictive Crowd Safety Platform
- 
-**Built for [Build in AI for India](https://buildinaiforindia.com) — a 7-day nationwide AI hackathon**
+
+Link to the Authority Dashnoard -[Authority Dashboard]([https://crowdgaurd-ai-2.onrender.com]) 
+Link to the Tourist Dashboard - [Tourist Dashboard]([https://crowdgaurd-ai-3.onrender.com])
+
+**Built for [Build in AI for India]([https://buildinai4india.com/]) — a 7-day nationwide AI hackathon**
  
 CrowdGuard AI is a multi-agent, computer-vision-powered platform that predicts dangerous crowd density **before** it becomes critical — giving authorities minutes of early warning instead of reacting after a crowd crush has already begun.
  
