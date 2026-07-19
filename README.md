@@ -40,6 +40,18 @@ The same prediction engine powers **two interfaces**: a detailed Authority Dashb
  
 ---
  
+## 📸 Product Screenshots & Live Interface
+
+### 1. Authority Command Center — Live YOLOv8 Stream & AI Risk Alerts
+![Authority Command Center Live Detection](./docs/Screenshot%202026-07-19%20112632.png)
+*Real-time YOLOv8 person tracking overlay, live density metrics, optical flow speed tracking, and instant Gemini AI risk alert stream with emergency force dispatching.*
+
+### 2. Critical Risk Alert & Emergency Force Dispatch Modal
+![Critical Risk Alert & Dispatch Modal](./docs/Screenshot%202026-07-19%20112601.png)
+*Instant critical risk pop-up notification triggering emergency response action protocols and security staff dispatch logging.*
+
+---
+
 ## System Architecture
  
 ![CrowdGuard AI System Architecture](./docs/architecture-diagram.png?v=2)
