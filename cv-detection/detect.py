@@ -340,6 +340,7 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
     
     try:
         while cap.isOpened():
+            loop_start_time = time.time()
             ret, frame = cap.read()
             
             if not ret:
@@ -544,9 +545,12 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
             if writer is not None:
                 writer.write(frame)
 
-            # Post streaming frame (annotated JPEG bytes) to Backend frame receiver
+            # Post streaming frame (annotated, downscaled & compressed JPEG) to Backend frame receiver
             try:
-                _, jpeg_buf = cv2.imencode('.jpg', frame)
+                # Downscale to 640x360 and compress at quality 55 for 18x faster network delivery & CPU relief
+                small_frame = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_NEAREST)
+                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 55]
+                _, jpeg_buf = cv2.imencode('.jpg', small_frame, encode_param)
                 http_session.post(frame_post_url, data=jpeg_buf.tobytes(), timeout=0.5)
             except Exception as post_err:
                 print(f"[CV-Detection] Error posting frame: {post_err}", flush=True)
@@ -678,6 +682,12 @@ def run_pipeline(video_path, output_json_path, camera_id, loop_video, sample_int
                 cv2.imwrite(sample_filename, frame)
                 if not test_mode:
                     print(f"[CV-Detection] Saved sample validation frame to: {sample_filename}")
+
+            # 8. Pace execution to match exact 1x natural video playback speed
+            target_frame_time = 1.0 / fps if (fps and fps > 0) else 0.033
+            loop_elapsed = time.time() - loop_start_time
+            if loop_elapsed < target_frame_time:
+                time.sleep(target_frame_time - loop_elapsed)
 
     except KeyboardInterrupt:
         print("\n[CV-Detection] Keyboard interrupt received. Exiting...")

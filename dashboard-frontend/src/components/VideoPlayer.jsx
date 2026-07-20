@@ -35,6 +35,15 @@ export default function VideoPlayer({ camera }) {
     setIsLoading(true);
     setHasError(false);
     setLoadingMessage("Connecting to live camera...");
+
+    // For MJPEG streams, <img> tag onLoad never fires due to multipart boundary. 
+    // Clear loading state after 400ms so video displays instantly!
+    if (camera.streamUrl && camera.streamUrl.includes('/stream')) {
+      const fastLoadTimer = setTimeout(() => {
+        setIsLoading(false);
+      }, 400);
+      return () => clearTimeout(fastLoadTimer);
+    }
     
     const cycleMessages = [
       "Connecting to live camera...",

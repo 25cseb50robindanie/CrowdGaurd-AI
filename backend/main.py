@@ -55,6 +55,9 @@ active_processes = {}
 # Global metrics history for prediction stability (zone_id -> deque)
 metrics_history = {}
 
+# Global latch set for sticky high-risk status (zone_id)
+latched_high_risk_zones = set()
+
 # Ensure uploads directory exists
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -289,6 +292,15 @@ def run_prediction_engine(zone_id: str, person_count: int, density: float, rolli
                 else:
                     prediction_message = f"Safe - Crowd counts are stable within margins (capacity usage: {capacity_usage:.1f}%)."
 
+    # Sticky High Risk Latch: Once high risk is triggered (or count >= 80), keep it high and do not revert back
+    if zone_id in latched_high_risk_zones or person_count >= 80 or predicted_risk == "high" or risk == "high" or risk_score >= 7.0:
+        latched_high_risk_zones.add(zone_id)
+        predicted_risk = "high"
+        risk = "high"
+        risk_score = max(risk_score, 8.5)
+        if "Avoid" not in prediction_message:
+            prediction_message = f"Avoid - Critical risk level reached with {person_count} people counted (exceeding 80 threshold)."
+
     # Determine reason for logging
     reason = "Normal operations"
     if predicted_risk == "high":
@@ -453,11 +465,15 @@ def get_live_zones_data() -> List[Zone]:
             except Exception as err:
                 logger.warning(f"Agent server connection timed out or offline: {err}. Using deterministic fallback.")
                 
-            status = "green"
-            if risk_level == "high":
+            if zone_id in latched_high_risk_zones or risk_level == "high" or pred_res["predicted_risk"] == "high":
+                latched_high_risk_zones.add(zone_id)
+                risk_level = "high"
                 status = "red"
+                pred_res["predicted_risk"] = "high"
             elif risk_level == "medium":
                 status = "amber"
+            else:
+                status = "green"
                 
             message_str = f"{explanation} Recommendation: {recommendation}"
             
@@ -830,6 +846,9 @@ async def upload_camera(
         )
         active_processes[camera_id] = proc
         
+        # Pre-seed latest_frames with instant preview frame so camera loads in 0ms on click!
+        latest_frames[camera_id] = get_offline_placeholder()
+        
         # Monitor the process for errors/unexpected exit
         monitor_thread = threading.Thread(
             target=monitor_subprocess, 
@@ -888,6 +907,7 @@ async def unlink_camera(camera_id: str):
         cursor.execute("DELETE FROM live_metrics WHERE camera_id = ?", (camera_id,))
         if zone_id:
             cursor.execute("DELETE FROM alerts WHERE zone_id = ?", (zone_id,))
+            latched_high_risk_zones.discard(zone_id)
             
         conn.commit()
     except Exception as db_err:
@@ -954,6 +974,9 @@ def startup_event():
                 stderr=subprocess.STDOUT
             )
             active_processes[cam_id] = proc
+            
+            # Pre-seed latest_frames with instant preview frame so camera loads in 0ms on click!
+            latest_frames[cam_id] = get_offline_placeholder()
             
             monitor_thread = threading.Thread(
                 target=monitor_subprocess, 

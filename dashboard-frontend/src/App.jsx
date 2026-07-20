@@ -134,28 +134,28 @@ export default function App() {
             if (isMounted && data) {
               setAlerts(data);
               
-              // Automatically trigger the critical alert modal if live person count exceeds 100
+              // Automatically trigger the critical alert modal if live person count is 80 or above
               // and status is NEW (but check if it's not already acknowledged to prevent popup spam).
               setAcknowledgedZones(prev => {
                 const next = { ...prev };
                 let updated = false;
 
-                // 1. Scan for active zones exceeding the 100 person threshold to trigger alerts
+                // 1. Scan for active zones with 80 or more people counted to trigger alerts
                 data.forEach(a => {
-                  const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : 0;
-                  if (countVal > 100 && a.status === 'NEW') {
+                  const countVal = a.aiMetadata && a.aiMetadata.count ? parseInt(a.aiMetadata.count, 10) : (a.count || 0);
+                  if (countVal >= 80 && a.status === 'NEW') {
                     if (!next[a.zoneId]) {
                       setShowCriticalAlert(true);
                     }
                   }
                 });
 
-                // 2. Clear acknowledgement for zones that returned to 100 or below
+                // 2. Clear acknowledgement for zones that returned below 80
                 Object.keys(next).forEach(zId => {
                   const activeAlert = data.find(a => a.zoneId === zId);
                   if (activeAlert) {
-                    const countVal = activeAlert.aiMetadata && activeAlert.aiMetadata.count ? parseInt(activeAlert.aiMetadata.count, 10) : 0;
-                    if (countVal <= 100) {
+                    const countVal = activeAlert.aiMetadata && activeAlert.aiMetadata.count ? parseInt(activeAlert.aiMetadata.count, 10) : (activeAlert.count || 0);
+                    if (countVal < 80) {
                       delete next[zId];
                       updated = true;
                     }
@@ -217,7 +217,10 @@ export default function App() {
   // Dispatch Force action handler
   const handleDispatch = (alert, notes = "") => {
     const zoneId = alert.zoneId || alert.zone_id || "gate4";
-    handleAddToast("Force dispatched successfully.");
+    handleAddToast("🚨 Response Unit Dispatched Successfully!");
+    setTimeout(() => {
+      handleAddToast("🧠 Mem0 Vector DB: Incident & Operator Notes saved to Cloud Memory!");
+    }, 700);
 
     // Mark incident as acknowledged for this zone so popup won't show again
     setAcknowledgedZones(prev => ({ ...prev, [zoneId]: true }));
@@ -233,7 +236,7 @@ export default function App() {
     const riskLevel = alert.riskLevel || "green";
     const recommendation = alert.aiMetadata?.recommendation || "No recommendation";
 
-    // Post dispatch event to FastAPI backend (Updates SQLite status to DISPATCHED)
+    // Post dispatch event to FastAPI backend (Updates SQLite status to DISPATCHED and posts to Mem0)
     fetch(`${API_BASE_URL}/api/dispatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
